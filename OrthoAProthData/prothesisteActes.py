@@ -345,6 +345,12 @@ class App(ctk.CTk):
                 elif key == "Date du rdv":
                     dt = datetime.fromisoformat(value)
                     values.append(dt.strftime("%d/%m/%Y %H:%M"))
+                elif key == "PE":
+                    try:
+                        dt = datetime.fromisoformat(value)
+                        values.append(dt.strftime("%d/%m/%Y %H:%M"))
+                    except (ValueError, TypeError):
+                        values.append("")
                 else:
                     values.append(value)
 

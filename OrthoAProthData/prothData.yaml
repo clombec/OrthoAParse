@@ -8,5 +8,6 @@ prothesiste:
     - "Acte prothésiste"
     - "Date d'envoi au labo"
     - "Date de réception"
+    - "PE"
     - "Durée"
     - "Commentaires"

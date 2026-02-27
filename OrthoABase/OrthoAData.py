@@ -46,7 +46,7 @@ class OrthoADataParse():
                 quotechar='"',
                 quoting=csv.QUOTE_ALL,   # ou QUOTE_MINIMAL selon ton fichier
                 engine="python"          # plus tolérant que le moteur C
-            )
+            ).fillna("")
 
             rows = self.cleanUp(df, structure_name)
 
