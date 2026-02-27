@@ -1,0 +1,6 @@
+webdriver_manager
+selenium
+pyyaml
+pandas
+beautifulsoup4
+customtkinter

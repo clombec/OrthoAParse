@@ -1,0 +1,5 @@
+# This is an example of the configuration file. You should create a config.yaml file with the same structure and fill in the values with your own credentials and settings.
+connexion:
+  url: "xxxx-app"
+  login: "xxx.xxx@xxx.xx"
+  pwd: "xxxxxx"
