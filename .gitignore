@@ -3,3 +3,6 @@ config.yaml
 .venvmac
 TestFiles
 __pycache__
+build
+dist/downloads
+mainProth.spec

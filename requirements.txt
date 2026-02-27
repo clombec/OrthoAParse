@@ -4,3 +4,4 @@ pyyaml
 pandas
 beautifulsoup4
 customtkinter
+pillow

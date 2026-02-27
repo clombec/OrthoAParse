@@ -24,8 +24,9 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Gestion Prothésiste")
-        self.geometry("1400x750")
+        self.title("Actes Prothésiste")
+        self.geometry("900x500")
+        self.iconbitmap("OrthoAProth.ico")
 
         self.full_data = []
         self.filtered_data = []
@@ -78,6 +79,7 @@ class App(ctk.CTk):
         )['prothesiste']
 
         self.setup_columns()
+        self.update_filters()
 
         self.apply_filters()
 
@@ -91,21 +93,16 @@ class App(ctk.CTk):
         frame = ctk.CTkFrame(self)
         frame.pack(fill="x", padx=10, pady=10)
 
-        proth_values = sorted(set(d["Prothésiste"] for d in self.full_data))
-        acte_values = sorted(set(d["Acte prothésiste"] for d in self.full_data))
-
-        # Filtre prothésiste
         self.proth_filter = ctk.CTkComboBox(
             frame,
-            values=["Tous"] + proth_values,
+            values=["Tous"],
             command=self.apply_filters,
             width=180
         )
         self.proth_filter.set("Tous")
         self.proth_filter.pack(side="left", padx=10)
 
-        # Multi sélection actes
-        self.acte_values = acte_values
+        self.acte_values = []
 
         self.acte_button = ctk.CTkButton(
             frame,
@@ -155,6 +152,27 @@ class App(ctk.CTk):
         )
         self.color_button.pack(side="left", padx=10)
 
+    def update_filters(self):
+
+        if not self.full_data:
+            return
+
+        proth_values = sorted(
+            set(d["Prothésiste"] for d in self.full_data)
+        )
+
+        acte_values = sorted(
+            set(d["Acte prothésiste"] for d in self.full_data)
+        )
+
+        # Mise à jour combo prothésiste
+        self.proth_filter.configure(
+            values=["Tous"] + proth_values
+        )
+
+        # Mise à jour liste actes
+        self.acte_values = acte_values
+        
     # =========================
     # Menu couleurs
     # =========================
@@ -263,7 +281,7 @@ class App(ctk.CTk):
 
         COLOR_MAP = self.temp_colors.copy()
 
-        with open("ColorActe.yaml", "w", encoding="utf-8") as f:
+        with open("OrthoAProthData/ColorActe.yaml", "w", encoding="utf-8") as f:
             yaml.dump(COLOR_MAP, f, allow_unicode=True)
 
         self.color_window.destroy()

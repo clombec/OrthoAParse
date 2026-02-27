@@ -1,0 +1,10 @@
+1. In command prompt, navigate to Serilabel folder
+2. activate local venv:
+	- On Windows: .venv\Scripts\activate
+3. Install pyinstaller if not already available in venv: pip install pyinstaller
+4. Go to Tools
+	cd Tools
+5. Run Release.bat
+-->
+Exe is generated in ../code/dist
+6. Commit updates (exe from code/dist)

@@ -42,7 +42,7 @@ class OrthoADataParse():
             df = pd.read_csv(
                 csv_file,
                 encoding="utf-8",
-                sep=";",
+                sep=None,
                 quotechar='"',
                 quoting=csv.QUOTE_ALL,   # ou QUOTE_MINIMAL selon ton fichier
                 engine="python"          # plus tolérant que le moteur C
