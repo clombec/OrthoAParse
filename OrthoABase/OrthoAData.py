@@ -34,9 +34,9 @@ class OrthoADataParse():
     def parseCsv(self, csv_url, structure_name):
         rows = None
         if not DEBUG_NO_DL:
-            self.orthoAdl.downloadCsv(csv_url)
-        # Implement CSV parsing logic here
-        csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
+            csv_file = self.orthoAdl.downloadCsv(csv_url)
+        else:
+            csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
         if os.path.exists(csv_file):
 #            df = pd.read_csv(csv_file, encoding="utf-8")
             df = pd.read_csv(

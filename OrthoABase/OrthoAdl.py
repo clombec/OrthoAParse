@@ -119,13 +119,41 @@ class OrthoAdl():
 
             # 9. Wait for the download to start
             print("Downloading...")
-            time.sleep(5)  # Wait 5 seconds for the download
+
+            downloaded_file = self.wait_for_download()
 
             # 10. Verify that the CSV file has been downloaded
             print("Download complete. Check the 'downloads' folder")
 
+            return downloaded_file
+
         except Exception as e:
             print(f"An error occurred: {e}")
+
+    def wait_for_download(self, timeout=30):
+        """
+        Attend qu'un fichier soit complètement téléchargé dans download_dir.
+        Retourne le chemin du fichier téléchargé.
+        """
+
+        start_time = time.time()
+
+        while True:
+            files = os.listdir(self.download_dir)
+
+            # Ignore les fichiers temporaires Chrome (.crdownload)
+            completed_files = [
+                f for f in files
+                if not f.endswith(".crdownload")
+            ]
+
+            if completed_files:
+                return os.path.join(self.download_dir, completed_files[0])
+
+            if time.time() - start_time > timeout:
+                raise TimeoutError("Téléchargement non détecté")
+
+            time.sleep(0.5)
 
     def downloadPageHtml(self, pageUrl, filename="page_content.html"):
         self.clearDownloadDir()  # Clear the download directory before downloading a new file
