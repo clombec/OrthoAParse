@@ -86,19 +86,7 @@ class OrthoAdl():
         # 6. Attendre la page principale après la connexion
         time.sleep(5)  # Attendre 5 secondes
 
-    def clearDownloadDir(self):
-        for entry in os.listdir(self.download_dir):
-            path = os.path.join(self.download_dir, entry)
-            try:
-                if os.path.isfile(path) or os.path.islink(path):
-                    os.unlink(path)
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
-            except Exception as e:
-                print(f"Could not remove {path}: {e}")
-
     def downloadCsv(self, pageUrl):
-        self.clearDownloadDir()  # Clear the download directory before downloading a new file
         # Access the page with the CSV export button
         driver = self.driver
         driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
@@ -128,7 +116,6 @@ class OrthoAdl():
             print(f"An error occurred: {e}")
 
     def downloadPageHtml(self, pageUrl, filename="page_content.html"):
-        self.clearDownloadDir()  # Clear the download directory before downloading a new file
         # Access the page and download text content
         driver = self.driver
         print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
@@ -147,7 +134,6 @@ class OrthoAdl():
 
 
     def downloadPageText(self, pageUrl, filename="page_content.txt"):
-        self.clearDownloadDir()  # Clear the download directory before downloading a new file
         # Access the page and download text content
         driver = self.driver
         print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")

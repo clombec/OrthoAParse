@@ -10,11 +10,15 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 
-DEBUG_NO_DL = False
+DEBUG_NO_DL_IN = False
 
 class OrthoADataParse():
     def __init__(self, download_dir):
-        if DEBUG_NO_DL:
+        if not os.path.exists(download_dir) or not os.listdir(download_dir):
+            self.DEBUG_NO_DL = False
+        else:
+            self.DEBUG_NO_DL = DEBUG_NO_DL_IN
+        if self.DEBUG_NO_DL:
             self.orthoAdl = OrthoAdl.OrthoAdl(download_dir, no_dl=True)
         else:
             self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)
@@ -30,10 +34,12 @@ class OrthoADataParse():
 
     def end(self):
         self.orthoAdl.end()
+        if not DEBUG_NO_DL_IN:
+            DownloadDir.clearDownloadDir(self.orthoAdl.download_dir)  # Clear the download directory after usage
     
     def parseCsv(self, csv_url, structure_name):
         rows = None
-        if not DEBUG_NO_DL:
+        if not self.DEBUG_NO_DL:
             self.orthoAdl.downloadCsv(csv_url)
         # Implement CSV parsing logic here
         csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
@@ -54,7 +60,7 @@ class OrthoADataParse():
 
     def parseJson(self, json_url, structure_name):
         rows = None
-        if not DEBUG_NO_DL:
+        if not self.DEBUG_NO_DL:
             self.orthoAdl.downloadPageText(json_url)
         json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
         if os.path.exists(json_file):
@@ -71,7 +77,7 @@ class OrthoADataParse():
     def parseHtml(self, html_url, structure_name):
         rows = None
         htmlpage = "page_content.html"
-        if not DEBUG_NO_DL:
+        if not self.DEBUG_NO_DL:
             self.orthoAdl.downloadPageHtml(html_url, htmlpage)
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if os.path.exists(html_file):
@@ -86,7 +92,7 @@ class OrthoADataParse():
     def parseMulti(self, html_url, structure_name):
         outdata = None
         htmlpage = "page_content.html"
-        if not DEBUG_NO_DL:
+        if not self.DEBUG_NO_DL:
             self.orthoAdl.downloadPageHtml(html_url, htmlpage)
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if os.path.exists(html_file):
@@ -274,10 +280,7 @@ class OrthoADataParse():
 Get all data from OrthoAdvance, parse it and save it in a structured format (e.g. CSV, JSON, database)
 """
 def extract(urlFile="url.yaml"):    # Configurer le dossier de téléchargement
-    if not DEBUG_NO_DL:
-        download_dir = DownloadDir.setupDownloadDir("downloads")
-    else:
-        download_dir = DownloadDir.setupDownloadDir("downloads", noclean=True)
+    download_dir = DownloadDir.setupDownloadDir("downloads")
     orthoAdp = OrthoADataParse(download_dir)
 
     # Load configuration from url.yaml
