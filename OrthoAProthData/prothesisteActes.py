@@ -7,13 +7,7 @@ import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
 from tkinter import colorchooser
 import platform
-
-
-# =========================
-# Chargement YAML couleurs
-# =========================
-with open("OrthoAProthData/ColorActe.yaml", "r", encoding="utf-8") as f:
-    COLOR_MAP = yaml.safe_load(f)
+import webbrowser
 
 
 # =========================
@@ -27,6 +21,7 @@ class App(ctk.CTk):
         self.title("Actes Prothésiste")
         self.geometry("900x500")
         self.iconbitmap("OrthoAProth.ico")
+        self.click_str = "▶▶ Ouvrir dans OrthoAdvance "
 
         self.full_data = []
         self.filtered_data = []
@@ -70,13 +65,27 @@ class App(ctk.CTk):
 
     def load_data(self):
 
-        with open("OrthoAProthData/ColorActe.yaml", "r", encoding="utf-8") as f:
-            global COLOR_MAP
-            COLOR_MAP = yaml.safe_load(f)
+        with open("OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
+            global COLOR_MAP, COLUMN_MAP
+            yamlconfig = yaml.safe_load(f)
+            COLOR_MAP = yamlconfig.get("colors", {})
+            COLUMN_MAP = yamlconfig.get("columns", {})
 
-        self.full_data = OrthoAData.extract(
+        data = OrthoAData.extract(
             "OrthoAProthData/prothData.yaml"
-        )['prothesiste']
+        )
+        self.full_data = data['prothesiste']
+        self.patientIds = data['users']
+
+        for line in self.full_data:
+            patient_name = line.get("Patient", "")
+            for id in self.patientIds:
+                if id["name"].lower() == patient_name.lower():
+                    line["url"] = f"{self.click_str}{id['url']}"
+                    break
+
+        
+        print(f"Data loaded at {datetime.now().strftime('%H:%M:%S')}. {len(self.full_data)} records found.")
 
         self.setup_columns()
         self.update_filters()
@@ -84,6 +93,8 @@ class App(ctk.CTk):
         self.apply_filters()
 
         self.hide_loading()
+
+        print(f"Data processing complete at {datetime.now().strftime('%H:%M:%S')}. Table populated with {len(self.filtered_data)} records.")
         
     # =========================
     # Filtres
@@ -277,12 +288,17 @@ class App(ctk.CTk):
                 
     def save_colors(self):
 
-        global COLOR_MAP
+        global COLOR_MAP, COLUMN_MAP
 
         COLOR_MAP = self.temp_colors.copy()
+        #COLUMN_MAP = self.temp_columns.copy()
 
-        with open("OrthoAProthData/ColorActe.yaml", "w", encoding="utf-8") as f:
-            yaml.dump(COLOR_MAP, f, allow_unicode=True)
+        with open("OrthoAProthData/configuration.yaml", "w", encoding="utf-8") as f:
+            config = {
+                "colors": COLOR_MAP,
+                "columns": COLUMN_MAP
+            }
+            yaml.dump(config, f, allow_unicode=True)
 
         self.color_window.destroy()
 
@@ -305,7 +321,42 @@ class App(ctk.CTk):
 
         self.tree.bind("<Double-1>", self.on_double_click)
 
+        self.tree.bind("<Button-1>", self.on_click)
+
+        self.tree.bind("<Motion>", self.on_hover)
+
+    def on_hover(self, event):
+
+        column = self.tree.identify_column(event.x)
+
+        if column:
+            col_index = int(column.replace("#", "")) - 1
+            col_name = self.tree["columns"][col_index]
+
+            if col_name == "url":
+                self.tree.configure(cursor="hand2")
+            else:
+                self.tree.configure(cursor="")
+                
+    def on_click(self, event):
+
+        item = self.tree.identify_row(event.y)
+        column = self.tree.identify_column(event.x)
+
+        if not item or not column:
+            return
+
+        col_index = int(column.replace("#", "")) - 1
+        col_name = self.tree["columns"][col_index]
+
+        if col_name == "url":
+            value = self.tree.item(item)["values"][col_index].replace(self.click_str, "")
+
+            if value:
+                webbrowser.open(value)
+
     def setup_columns(self):
+        global COLUMN_MAP
 
         if not self.full_data:
             return
@@ -320,7 +371,8 @@ class App(ctk.CTk):
                 text=col,
                 command=lambda c=col: self.sort_column(c)
             )
-            self.tree.column(col, width=170, anchor="center")
+            ww = COLUMN_MAP.get(col, {}).get("width", 170)
+            self.tree.column(col, width=ww, anchor="center")
 
     # =========================
     # Remplissage table
@@ -362,11 +414,11 @@ class App(ctk.CTk):
             if tag in COLOR_MAP:
                 self.tree.tag_configure(tag, background=COLOR_MAP[tag])
             else:
-                COLOR_MAP[tag] = "#000000"
+                COLOR_MAP[tag] = "#FFFFFF"
                 self.tree.tag_configure(tag, background=COLOR_MAP[tag])
 
             # Hauteur dynamique
-            row_height = 25 + (max_lines - 1) * 18
+            row_height = 25 #+ (max_lines - 1) * 18
             self.tree.item(item_id)
             self.tree.configure(style="Custom.Treeview")
 
@@ -450,7 +502,7 @@ class App(ctk.CTk):
     # Refresh
     # =========================
     def refresh(self):
-
+        print(f"Refreshing data at {datetime.now().strftime('%H:%M:%S')}...")
         self.show_loading()
         self.after(100, self.load_data)
 

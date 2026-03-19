@@ -1,0 +1,52 @@
+colors:
+  '?': '#FFFFFF'
+  Analyse empreinte coll indirect: '#ff8080'
+  Analyse empreinte go max: '#ff8080'
+  Analyse pour aligneurs: '#FFFFFF'
+  Coll ind 1 arcade: '#997c00'
+  Couper Go de collage indirect: '#329600'
+  Couper Go de contention: '#FFFFFF'
+  Couper gouttiére de contention: '#329600'
+  Disjoncteur: '#ee43ff'
+  ELN: '#FFFFFF'
+  Impression resine simu chir: '#FFFFFF'
+  Impression résine: '#80ffff'
+  Isoler modele pour collage indirect: '#ff008e'
+  None: '#FFFFFF'
+  Préparer prescription MB: '#0080ff'
+  Réception aligneurs: '#FFFFFF'
+  Thermoformer Gouttière de collage indirect: '#ff80c0'
+  Thermoformer Gouttière de contention: '#ff80c0'
+  impression coll ind 1 arcade: '#5b65ff'
+  impression pour go max: '#5b65ff'
+columns:
+  Acte prothésiste:
+    fontcolor: '#FFFFFF'
+    width: 400
+  Commentaires:
+    fontcolor: '#FFFFFF'
+    width: 200
+  Date d'envoi au labo:
+    fontcolor: '#FFFFFF'
+    width: 150
+  Date de réception:
+    fontcolor: '#FFFFFF'
+    width: 150
+  Date du rdv:
+    fontcolor: '#FFFFFF'
+    width: 150
+  Durée:
+    fontcolor: '#FFFFFF'
+    width: 20
+  PE:
+    fontcolor: '#FFFFFF'
+    width: 150
+  Patient:
+    fontcolor: '#FFFFFF'
+    width: 150
+  Prothésiste:
+    fontcolor: '#FFFFFF'
+    width: 10
+  url:
+    fontcolor: '#5C9EF2'
+    width: 20

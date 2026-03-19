@@ -28,21 +28,21 @@ class OrthoADataParse():
             "metatypes": self.cleanUpMetatypes,
             "users": self.cleanUpUsers,
             "alldays2026": self.cleanUpJt2026,
-            "prothesiste": self.cleanUpCsv
+            "prothesiste": self.cleanUpCsv,
+            "recette": self.cleanUpCsv
         }
         self.dataKeys = {}
 
     def end(self):
         self.orthoAdl.end()
-        if not DEBUG_NO_DL_IN:
-            DownloadDir.clearDownloadDir(self.orthoAdl.download_dir)  # Clear the download directory after usage
     
     def parseCsv(self, csv_url, structure_name):
         rows = None
-        if not DEBUG_NO_DL:
-            self.orthoAdl.downloadCsv(csv_url)
-        # Implement CSV parsing logic here
-        csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
+        if not self.DEBUG_NO_DL:
+            csv_file = self.orthoAdl.downloadCsv(csv_url)
+        else:
+            csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
+        print(f"Looking for CSV file at {csv_file}")
         if os.path.exists(csv_file):
 #            df = pd.read_csv(csv_file, encoding="utf-8")
             df = pd.read_csv(
@@ -231,7 +231,8 @@ class OrthoADataParse():
             # Create out structure with only the user ID and the full name "Prénom Nom"
             out_struct.append({
                 "id": user.get(patientId),  # Assuming the first key is the user ID
-                "name": f"{user.get(firstName)} {user.get(lastName)}" # Assuming the second key is the last name and the third key is the first name
+                "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
+                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user.get(patientId)}/profile/"  # Construct the URL for the user profile
             })
         return out_struct
     
@@ -281,6 +282,8 @@ Get all data from OrthoAdvance, parse it and save it in a structured format (e.g
 """
 def extract(urlFile="url.yaml"):    # Configurer le dossier de téléchargement
     download_dir = DownloadDir.setupDownloadDir("downloads")
+    if not DEBUG_NO_DL_IN:
+        DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage
     orthoAdp = OrthoADataParse(download_dir)
 
     # Load configuration from url.yaml
@@ -304,6 +307,9 @@ def extract(urlFile="url.yaml"):    # Configurer le dossier de téléchargement
             data = orthoAdp.parseHtml(url, structure_name)
         elif data_type == "multi":
             data = orthoAdp.parseMulti(url, structure_name)
+
+        if not DEBUG_NO_DL_IN:
+            DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory after usage
 
         if data is not None:
             parsed_data[structure_name] = data

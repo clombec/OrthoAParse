@@ -8,6 +8,7 @@ OrthoAdvance url and credentials are taken from an external config file.
 This script uses Selenium to automate the web browser interactions.
 """
 
+from socket import timeout
 from symtable import Class
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -19,6 +20,7 @@ import os
 import time
 import shutil
 import yaml
+from datetime import datetime
 
 class OrthoAdl():
     def __init__(self, download_dir, no_dl=False):
@@ -35,7 +37,24 @@ class OrthoAdl():
         if not self.no_dl:
             self.connect(download_dir)
 
+    def wait_login_flow(self, timeout=10):
+        def check(d):
+            try:
+                el = d.find_element(By.ID, "users-0")
+                if el.is_displayed() and el.is_enabled():
+                    return ("user_page", el)
+            except:
+                pass
+
+            if d.find_elements(By.ID, "password"):
+                return ("password_page", None)
+
+            return False
+
+        return WebDriverWait(self.driver, timeout).until(check)
+
     def connect(self, download_dir):
+        print(f"Connecting to OrthoAdvance at {datetime.now().strftime('%H:%M:%S')}...")
         # Configurer Chrome options for downloads
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless")  # Hidden mode. Comment to show the browser
@@ -50,24 +69,24 @@ class OrthoAdl():
 
         # Initialize Chrome driver
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
+        print(f"Chrome driver initialized at {datetime.now().strftime('%H:%M:%S')}.")
         # 1. Access the user selection page
         connect_url = f"{self.OrthoAUrlBase}/#!/login/connect"
-        self.driver.get(connect_url)        
+        self.driver.get(connect_url)      
+        print(f"Login page loaded at {datetime.now().strftime('%H:%M:%S')}. URL: {connect_url}")  
 
-        try:
-            # 2. Select user 0
-            user_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "users-0"))
-            )
-            user_button.click()
-        except Exception as e:
-            print(f"No init page : {e}")
+        result, element = self.wait_login_flow(10)
 
-        # 3. Wait for the password page
-        WebDriverWait(self.driver, 5).until(
-            EC.presence_of_element_located((By.ID, "password"))
-        )
+        if result == "user_page" and element:
+            element.click()
+            # 3. Wait for the password page 
+            print(f"Waiting for password page at {datetime.now().strftime('%H:%M:%S')}...") 
+            WebDriverWait(self.driver, 5).until( 
+                EC.presence_of_element_located((By.ID, "password")) 
+                )
+
+        elif result == "password_page":
+            pass
 
         # 4.1 fill in the email field
         email_field = self.driver.find_element(By.ID, "email")
@@ -77,21 +96,30 @@ class OrthoAdl():
         password_field = self.driver.find_element(By.ID, "password")
         password_field.send_keys(self.OrthoAPwd)
 
+        print(f"Credentials entered at {datetime.now().strftime('%H:%M:%S')}...")
         # 5. Click on the "Me connecter" button
         login_button = WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable((By.ID, "btn-form-submit"))
         )
         login_button.click()
 
+        print(f"Login submitted at {datetime.now().strftime('%H:%M:%S')}...")
         # 6. Attendre la page principale après la connexion
-        time.sleep(5)  # Attendre 5 secondes
+        WebDriverWait(self.driver, 10).until(
+            lambda d: (
+#                d.execute_script("return document.readyState") == "complete" and
+                d.current_url != connect_url
+            )            
+        )
 
     def downloadCsv(self, pageUrl):
+        print(f"Download csv at {datetime.now().strftime('%H:%M:%S')}...")
         # Access the page with the CSV export button
         driver = self.driver
         driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
 
         try:
+            print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl} at {datetime.now().strftime('%H:%M:%S')}...")
             # 8. Click on the CSV export button
             wait = WebDriverWait(driver, 15)
 
@@ -103,22 +131,23 @@ class OrthoAdl():
                 )
             )
 
+            print(f"Export button found at {datetime.now().strftime('%H:%M:%S')}. Clicking to start download...")
             export_button.click()
 
             # 9. Wait for the download to start
-            print("Downloading...")
+            print(f"Waiting for download to complete at {datetime.now().strftime('%H:%M:%S')}...")
 
-            downloaded_file = self.wait_for_download()
+            downloaded_file = self.wait_for_download((".csv"))
 
             # 10. Verify that the CSV file has been downloaded
-            print("Download complete. Check the 'downloads' folder")
+            print(f"Download complete at {datetime.now().strftime('%H:%M:%S')}. File saved to: {downloaded_file}")
 
             return downloaded_file
 
         except Exception as e:
             print(f"An error occurred: {e}")
 
-    def wait_for_download(self, timeout=30):
+    def wait_for_download(self, file_extension, timeout=60):
         """
         Attend qu'un fichier soit complètement téléchargé dans download_dir.
         Retourne le chemin du fichier téléchargé.
@@ -132,13 +161,15 @@ class OrthoAdl():
             # Ignore les fichiers temporaires Chrome (.crdownload)
             completed_files = [
                 f for f in files
-                if not f.endswith(".crdownload")
+                if f.endswith(file_extension)
             ]
 
             if completed_files:
+                print(f"File downloaded: {completed_files[0]}")
                 return os.path.join(self.download_dir, completed_files[0])
 
             if time.time() - start_time > timeout:
+                print("Download timeout reached.")
                 raise TimeoutError("Téléchargement non détecté")
 
             time.sleep(0.5)

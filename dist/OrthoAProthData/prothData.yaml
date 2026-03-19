@@ -11,3 +11,11 @@ prothesiste:
     - "PE"
     - "Durée"
     - "Commentaires"
+
+users:
+  url: "users/recherche"
+  type: csv
+  keys:
+    - "Nom"
+    - "Nom.1"
+    - "Prénom"
