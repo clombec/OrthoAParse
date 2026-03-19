@@ -1,0 +1,6 @@
+recette:
+  url: "reglements/history"
+  type: csv
+  keys:
+    - "Montant"
+    - "A"
