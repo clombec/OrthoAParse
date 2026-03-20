@@ -63,6 +63,44 @@ class App(ctk.CTk):
         if hasattr(self, "loading_frame"):
             self.loading_frame.destroy()
 
+    def show_error(self, message):
+        """Replace the loading overlay with a visible error message + retry button."""
+        self.hide_loading()
+
+        self.error_frame = ctk.CTkFrame(self)
+        self.error_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(
+            self.error_frame,
+            text="⚠️ Erreur de connexion",
+            font=("Arial", 18, "bold"),
+            text_color="red"
+        ).pack(padx=40, pady=(30, 10))
+
+        ctk.CTkLabel(
+            self.error_frame,
+            text=message,
+            font=("Arial", 13),
+            wraplength=420,
+            justify="center"
+        ).pack(padx=40, pady=(0, 20))
+
+        ctk.CTkButton(
+            self.error_frame,
+            text="Réessayer",
+            command=self.retry_load,
+            width=140
+        ).pack(pady=(0, 30))
+
+    def hide_error(self):
+        if hasattr(self, "error_frame"):
+            self.error_frame.destroy()
+
+    def retry_load(self):
+        self.hide_error()
+        self.show_loading()
+        self.after(100, self.load_data)
+
     def load_data(self):
 
         with open("OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
@@ -71,9 +109,20 @@ class App(ctk.CTk):
             COLOR_MAP = yamlconfig.get("colors", {})
             COLUMN_MAP = yamlconfig.get("columns", {})
 
-        data = OrthoAData.extract(
-            "OrthoAProthData/prothData.yaml"
-        )
+        try:
+            data = OrthoAData.extract(
+                "OrthoAProthData/prothData.yaml"
+            )
+        except OrthoAdl.OrthoAConnectionError as e:
+            self.show_error(str(e))
+            return
+        except OrthoAdl.OrthoADownloadError as e:
+            self.show_error(str(e))
+            return
+        except Exception as e:
+            self.show_error(f"Erreur inattendue : {e}")
+            return
+
         self.full_data = data['prothesiste']
         self.patientIds = data['users']
 

@@ -21,7 +21,7 @@ class OrthoADataParse():
         if self.DEBUG_NO_DL:
             self.orthoAdl = OrthoAdl.OrthoAdl(download_dir, no_dl=True)
         else:
-            self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)
+            self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
         self.cleanUpSwitch = {
             "rdvs_history": self.cleanUpCsv,
             "jt": self.cleanUpJourneesType,
@@ -40,7 +40,7 @@ class OrthoADataParse():
     def parseCsv(self, csv_url, structure_name):
         rows = None
         if not self.DEBUG_NO_DL:
-            csv_file = self.orthoAdl.downloadCsv(csv_url)
+            csv_file = self.orthoAdl.downloadCsv(csv_url)  # raises OrthoADownloadError on failure
         else:
             csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
         print(f"Looking for CSV file at {csv_file}")
@@ -62,7 +62,7 @@ class OrthoADataParse():
     def parseJson(self, json_url, structure_name):
         rows = None
         if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageText(json_url)
+            self.orthoAdl.downloadPageText(json_url)  # raises OrthoADownloadError on failure
         json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
         if os.path.exists(json_file):
             with open(json_file, "r", encoding="utf-8") as f:
@@ -79,7 +79,7 @@ class OrthoADataParse():
         rows = None
         htmlpage = "page_content.html"
         if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageHtml(html_url, htmlpage)
+            self.orthoAdl.downloadPageHtml(html_url, htmlpage)  # raises OrthoADownloadError on failure
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if os.path.exists(html_file):
             with open(html_file, "r", encoding="utf-8") as f:
@@ -103,7 +103,7 @@ class OrthoADataParse():
         htmlpage = "page_content.html"
 
         if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageHtml(index_url, htmlpage)
+            self.orthoAdl.downloadPageHtml(index_url, htmlpage)  # raises OrthoADownloadError on failure
 
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if not os.path.exists(html_file):
@@ -132,7 +132,12 @@ class OrthoADataParse():
         for jid, label in journee_ids:
             json_url = f"/planning/jt/journees/{jid}/;view?json=1"
             print(f"[parseMulti] Parsing day type {jid} ({label})...")
-            rows = self.parseJson(json_url, structure_name)
+            try:
+                rows = self.parseJson(json_url, structure_name)
+            except OrthoAdl.OrthoADownloadError as e:
+                # Log and skip this day type — don't abort the whole multi fetch
+                print(f"[parseMulti] Skipping day type {jid}: {e}")
+                continue
             if rows is not None:
                 outdata[jid] = {
                     "label": label,
@@ -141,7 +146,7 @@ class OrthoADataParse():
 
         print(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
-    
+
     def specific_filter(self, data, structure_name):
         if structure_name == "rdvs_history":
             for item in data:
@@ -334,11 +339,15 @@ class OrthoADataParse():
 
 """
 Get all data from OrthoAdvance, parse it and save it in a structured format (e.g. CSV, JSON, database)
+Raises OrthoAdl.OrthoAConnectionError if login fails.
+Raises OrthoAdl.OrthoADownloadError if a download fails.
 """
 def extract(urlFile="OrthoABase/url.yaml"):    # Configure download folder path and clear as needed
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
         DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage
+
+    # OrthoADataParse.__init__ calls OrthoAdl.connect() — raises OrthoAConnectionError if it fails
     orthoAdp = OrthoADataParse(download_dir)
 
     # Load configuration from url.yaml

@@ -1,4 +1,5 @@
 import OrthoABase.OrthoAData as OrthoAData
+import OrthoABase.OrthoAdl as OrthoAdl
 import requests
 from datetime import datetime
 
@@ -8,9 +9,20 @@ with open("OrthoARecettes/discord_webhook.txt", "r") as f:
     DISCORD_WEBHOOK_URL = f.read()
 
 def main():
-    data = OrthoAData.extract(
-        "OrthoARecettes/recettes.yaml"
-    )
+    try:
+        data = OrthoAData.extract(
+            "OrthoARecettes/recettes.yaml"
+        )
+    except OrthoAdl.OrthoAConnectionError as e:
+        print(f"[OrthoARecettes] Erreur de connexion à OrthoAdvance : {e}")
+        return
+    except OrthoAdl.OrthoADownloadError as e:
+        print(f"[OrthoARecettes] Erreur de téléchargement : {e}")
+        return
+    except Exception as e:
+        print(f"[OrthoARecettes] Erreur inattendue lors de la récupération des données : {e}")
+        return
+
     total = 0
     for line in data["recette"]:
         amount = line["Montant"]
@@ -21,7 +33,16 @@ def main():
     print(f"Total: {total:.2f}")
 
     data = {"content": f"RX @ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}: {total:.2f}"}
-    requests.post(DISCORD_WEBHOOK_URL, json=data)
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+        response.raise_for_status()
+    except requests.exceptions.ConnectionError as e:
+        print(f"[OrthoARecettes] Impossible de joindre Discord (réseau) : {e}")
+    except requests.exceptions.HTTPError as e:
+        print(f"[OrthoARecettes] Erreur HTTP Discord (webhook invalide ?) : {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"[OrthoARecettes] Erreur lors de l'envoi Discord : {e}")
+
 # =========================
 # Start
 # =========================
