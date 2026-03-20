@@ -2,9 +2,11 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk
 import yaml
+import logging
 from datetime import datetime, date
 import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
+import OrthoABase.OrthoALogger as OrthoALogger
 from tkinter import colorchooser
 import platform
 import webbrowser
@@ -114,12 +116,15 @@ class App(ctk.CTk):
                 "OrthoAProthData/prothData.yaml"
             )
         except OrthoAdl.OrthoAConnectionError as e:
+            logging.error(f"Erreur de connexion : {e}")
             self.show_error(str(e))
             return
         except OrthoAdl.OrthoADownloadError as e:
+            logging.error(f"Erreur de téléchargement : {e}")
             self.show_error(str(e))
             return
         except Exception as e:
+            logging.error(f"Erreur inattendue : {e}")
             self.show_error(f"Erreur inattendue : {e}")
             return
 
@@ -134,8 +139,7 @@ class App(ctk.CTk):
                     line["url"] = f"{self.click_str}{id['url']}"
                     break
 
-        
-        print(f"Data loaded at {datetime.now().strftime('%H:%M:%S')}. {len(self.full_data)} records found.")
+        logging.info(f"Data loaded. {len(self.full_data)} records found.")
 
         self.setup_columns()
         self.update_filters()
@@ -144,8 +148,8 @@ class App(ctk.CTk):
 
         self.hide_loading()
 
-        print(f"Data processing complete at {datetime.now().strftime('%H:%M:%S')}. Table populated with {len(self.filtered_data)} records.")
-        
+        logging.info(f"Data processing complete. Table populated with {len(self.filtered_data)} records.")
+
     # =========================
     # Filters
     # =========================
@@ -233,7 +237,7 @@ class App(ctk.CTk):
 
         # Update acts list cache
         self.acte_values = acte_values
-        
+
     # =========================
     # Color manager menu
     # =========================
@@ -282,7 +286,6 @@ class App(ctk.CTk):
                 elif event.num == 5:
                     canvas.yview_scroll(1, "units")
 
-
         # Windows & macOS scroll bindings
         canvas.bind("<MouseWheel>", _on_mousewheel)
 
@@ -326,7 +329,7 @@ class App(ctk.CTk):
 
         tk.Button(button_frame, text="Annuler",
                 command=self.color_window.destroy).pack(side="left", padx=20)
-        
+
     def choose_color(self, acte):
 
         color_code = colorchooser.askcolor(
@@ -336,7 +339,7 @@ class App(ctk.CTk):
         if color_code[1]:  # if not cancelled
             self.temp_colors[acte] = color_code[1]
             self.color_squares[acte].configure(bg=color_code[1])
-                
+
     def save_colors(self):
 
         global COLOR_MAP, COLUMN_MAP
@@ -388,7 +391,7 @@ class App(ctk.CTk):
                 self.tree.configure(cursor="hand2")
             else:
                 self.tree.configure(cursor="")
-                
+
     def on_click(self, event):
 
         item = self.tree.identify_row(event.y)
@@ -501,7 +504,7 @@ class App(ctk.CTk):
             bg_color = COLOR_MAP.get(acte, None)
 
         self.open_detail_window(values, bg_color)
-    
+
     # =========================
     # Detailed Window
     # =========================
@@ -548,12 +551,11 @@ class App(ctk.CTk):
         # Wait until details window is closed
         self.wait_window(detail)
 
-
     # =========================
     # Refresh controls
     # =========================
     def refresh(self):
-        print(f"Refreshing data at {datetime.now().strftime('%H:%M:%S')}...")
+        logging.info("Refreshing data...")
         self.show_loading()
         self.after(100, self.load_data)
 
@@ -633,17 +635,16 @@ class App(ctk.CTk):
 
         select_button_frame = tk.Frame(self.acte_window)
         select_button_frame.pack(fill="x", pady=10)
-    
+
         tk.Button(select_button_frame, text="Tout sélectionner",
                   command=self.select_all_actes).pack(side="left", padx=5)
 
         tk.Button(select_button_frame, text="Tout désélectionner",
                   command=self.deselect_all_actes).pack(side="left", padx=5)
 
-
         button_frame = tk.Frame(self.acte_window)
         button_frame.pack(fill="x", pady=10)
-    
+
         tk.Button(button_frame, text="OK",
                   command=self.validate_actes).pack(side="left", padx=5)
         tk.Button(button_frame, text="Annuler",
@@ -738,17 +739,23 @@ class App(ctk.CTk):
             """Convert values for stable sorting by date/numeric/text."""
 
             if col in ["Date d'envoi au labo", "Date de réception"]:
+                # Skip empty values — no format error to log here
+                if not value:
+                    return datetime.min
                 try:
                     return datetime.strptime(value, "%d/%m/%Y %H:%M")
-                except:
+                except ValueError:
                     try:
                         return datetime.strptime(value, "%d/%m/%Y")
-                    except:
+                    except ValueError:
+                        logging.warning(
+                            f"Unrecognised date format in column '{col}': '{value}' — defaulting to min date"
+                        )
                         return datetime.min
 
             try:
                 return float(value)
-            except:
+            except (ValueError, TypeError):
                 pass
 
             return str(value).lower()
@@ -759,6 +766,7 @@ class App(ctk.CTk):
         )
 
 def main():
+    OrthoALogger.setup_logger()
     app = App()
     app.mainloop()
 

@@ -1,6 +1,8 @@
 import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
+import OrthoABase.OrthoALogger as OrthoALogger
 import requests
+import logging
 import yaml
 import tkinter as tk
 from tkinter import messagebox
@@ -75,10 +77,12 @@ def ask_webhook_gui():
             )
             return
         save_webhook(url)
+        logging.info("Discord webhook URL saved to config.yaml.")
         result["url"] = url
         root.destroy()
 
     def on_skip():
+        logging.info("Discord webhook configuration skipped by user.")
         root.destroy()
 
     btn_frame = tk.Frame(root)
@@ -91,18 +95,20 @@ def ask_webhook_gui():
 
 
 def main():
+    OrthoALogger.setup_logger()
+
     try:
         data = OrthoAData.extract(
             "OrthoARecettes/recettes.yaml"
         )
     except OrthoAdl.OrthoAConnectionError as e:
-        print(f"[OrthoARecettes] Erreur de connexion à OrthoAdvance : {e}")
+        logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
         return
     except OrthoAdl.OrthoADownloadError as e:
-        print(f"[OrthoARecettes] Erreur de téléchargement : {e}")
+        logging.error(f"Erreur de téléchargement : {e}")
         return
     except Exception as e:
-        print(f"[OrthoARecettes] Erreur inattendue lors de la récupération des données : {e}")
+        logging.error(f"Erreur inattendue lors de la récupération des données : {e}")
         return
 
     total = 0
@@ -111,28 +117,30 @@ def main():
         canceled = line["A"]
         if not canceled:
             total = total + float(amount.replace(",", "."))
-            print(f"Recette: {amount}")
-    print(f"Total: {total:.2f}")
+            logging.info(f"Recette: {amount}")
+    logging.info(f"Total: {total:.2f}")
 
     # Load webhook URL from config.yaml — ask user via GUI if not set
     webhook_url = load_webhook()
     if not webhook_url:
+        logging.warning("Discord webhook not configured — opening setup window.")
         webhook_url = ask_webhook_gui()
 
     if not webhook_url:
-        print("[OrthoARecettes] Webhook Discord non configuré — envoi ignoré.")
+        logging.warning("Webhook Discord non configuré — envoi ignoré.")
         return
 
     payload = {"content": f"RX @ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}: {total:.2f}"}
     try:
         response = requests.post(webhook_url, json=payload)
         response.raise_for_status()
+        logging.info("Message envoyé sur Discord.")
     except requests.exceptions.ConnectionError as e:
-        print(f"[OrthoARecettes] Impossible de joindre Discord (réseau) : {e}")
+        logging.error(f"Impossible de joindre Discord (réseau) : {e}")
     except requests.exceptions.HTTPError as e:
-        print(f"[OrthoARecettes] Erreur HTTP Discord (webhook invalide ?) : {e}")
+        logging.error(f"Erreur HTTP Discord (webhook invalide ?) : {e}")
     except requests.exceptions.RequestException as e:
-        print(f"[OrthoARecettes] Erreur lors de l'envoi Discord : {e}")
+        logging.error(f"Erreur lors de l'envoi Discord : {e}")
 
 # =========================
 # Start

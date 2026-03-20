@@ -16,6 +16,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+import logging
 import os
 import time
 import shutil
@@ -65,7 +66,7 @@ class OrthoAdl():
         return WebDriverWait(self.driver, timeout).until(check)
 
     def connect(self, download_dir):
-        print(f"Connecting to OrthoAdvance at {datetime.now().strftime('%H:%M:%S')}...")
+        logging.info("Connecting to OrthoAdvance...")
         try:
             # Configure Chrome options for downloads
             chrome_options = webdriver.ChromeOptions()
@@ -81,20 +82,20 @@ class OrthoAdl():
 
             # Initialize Chrome driver
             self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-            print(f"Chrome driver initialized at {datetime.now().strftime('%H:%M:%S')}.")
+            logging.info("Chrome driver initialized.")
             # 1. Access the user selection page
             connect_url = f"{self.OrthoAUrlBase}/#!/login/connect"
-            self.driver.get(connect_url)      
-            print(f"Login page loaded at {datetime.now().strftime('%H:%M:%S')}. URL: {connect_url}")  
+            self.driver.get(connect_url)
+            logging.info(f"Login page loaded. URL: {connect_url}")
 
             result, element = self.wait_login_flow(10)
 
             if result == "user_page" and element:
                 element.click()
-                # 3. Wait for the password page 
-                print(f"Waiting for password page at {datetime.now().strftime('%H:%M:%S')}...") 
-                WebDriverWait(self.driver, 5).until( 
-                    EC.presence_of_element_located((By.ID, "password")) 
+                # 3. Wait for the password page
+                logging.info("Waiting for password page...")
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.ID, "password"))
                     )
 
             elif result == "password_page":
@@ -108,21 +109,22 @@ class OrthoAdl():
             password_field = self.driver.find_element(By.ID, "password")
             password_field.send_keys(self.OrthoAPwd)
 
-            print(f"Credentials entered at {datetime.now().strftime('%H:%M:%S')}...")
+            logging.info("Credentials entered.")
             # 5. Click on the "Me connecter" button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "btn-form-submit"))
             )
             login_button.click()
 
-            print(f"Login submitted at {datetime.now().strftime('%H:%M:%S')}...")
+            logging.info("Login submitted.")
             # 6. Wait for main page after login
             WebDriverWait(self.driver, 10).until(
                 lambda d: (
 #                d.execute_script("return document.readyState") == "complete" and
                     d.current_url != connect_url
-                )            
+                )
             )
+            logging.info("Login successful.")
 
         except Exception as e:
             raise OrthoAConnectionError(
@@ -130,13 +132,13 @@ class OrthoAdl():
             ) from e
 
     def downloadCsv(self, pageUrl):
-        print(f"Download csv at {datetime.now().strftime('%H:%M:%S')}...")
+        logging.info("Starting CSV download...")
         # Access the page with the CSV export button
         driver = self.driver
         driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
 
         try:
-            print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl} at {datetime.now().strftime('%H:%M:%S')}...")
+            logging.info(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
             # 8. Click on the CSV export button
             wait = WebDriverWait(driver, 15)
 
@@ -148,16 +150,16 @@ class OrthoAdl():
                 )
             )
 
-            print(f"Export button found at {datetime.now().strftime('%H:%M:%S')}. Clicking to start download...")
+            logging.info("Export button found. Clicking to start download...")
             export_button.click()
 
             # 9. Wait for the download to start
-            print(f"Waiting for download to complete at {datetime.now().strftime('%H:%M:%S')}...")
+            logging.info("Waiting for download to complete...")
 
             downloaded_file = self.wait_for_download((".csv"))
 
             # 10. Verify that the CSV file has been downloaded
-            print(f"Download complete at {datetime.now().strftime('%H:%M:%S')}. File saved to: {downloaded_file}")
+            logging.info(f"Download complete. File saved to: {downloaded_file}")
 
             return downloaded_file
 
@@ -186,11 +188,11 @@ class OrthoAdl():
             ]
 
             if completed_files:
-                print(f"File downloaded: {completed_files[0]}")
+                logging.info(f"File downloaded: {completed_files[0]}")
                 return os.path.join(self.download_dir, completed_files[0])
 
             if time.time() - start_time > timeout:
-                print("Download timeout reached.")
+                logging.error("Download timeout reached.")
                 raise TimeoutError("Téléchargement non détecté dans le délai imparti")
 
             time.sleep(0.5)
@@ -198,7 +200,7 @@ class OrthoAdl():
     def downloadPageHtml(self, pageUrl, filename="page_content.html"):
         # Access the page and download text content
         driver = self.driver
-        print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
+        logging.info(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
         try:
             driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
 
@@ -211,7 +213,7 @@ class OrthoAdl():
             # Save to file
             filename = os.path.join(self.download_dir, filename)
             with open(filename, "w", encoding="utf-8") as f:
-                f.write(html)        
+                f.write(html)
 
         except Exception as e:
             raise OrthoADownloadError(
@@ -221,24 +223,24 @@ class OrthoAdl():
     def downloadPageText(self, pageUrl, filename="page_content.txt"):
         # Access the page and download text content
         driver = self.driver
-        print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
-        
+        logging.info(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
+
         try:
             # Wait for page to load
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
-            
+
             # Extract page text
             page_text = driver.find_element(By.TAG_NAME, "body").text
-            
+
             # Save to file
             filename = os.path.join(self.download_dir, filename)
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(page_text)
-            
-            print(f"Page text saved to {filename}")
-            
+
+            logging.info(f"Page text saved to {filename}")
+
         except Exception as e:
             raise OrthoADownloadError(
                 f"Échec du téléchargement texte ({pageUrl}) : {e}"
@@ -260,7 +262,7 @@ def run():
                 elif os.path.isdir(path):
                     shutil.rmtree(path)
             except Exception as e:
-                print(f"Could not remove {path}: {e}")
+                logging.error(f"Could not remove {path}: {e}")
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)
 

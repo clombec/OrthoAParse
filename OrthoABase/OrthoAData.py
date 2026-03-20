@@ -1,5 +1,6 @@
 import datetime
 from . import OrthoAdl
+import logging
 import os
 import csv
 import pandas as pd
@@ -36,14 +37,14 @@ class OrthoADataParse():
 
     def end(self):
         self.orthoAdl.end()
-    
+
     def parseCsv(self, csv_url, structure_name):
         rows = None
         if not self.DEBUG_NO_DL:
             csv_file = self.orthoAdl.downloadCsv(csv_url)  # raises OrthoADownloadError on failure
         else:
             csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
-        print(f"Looking for CSV file at {csv_file}")
+        logging.info(f"Looking for CSV file at {csv_file}")
         if os.path.exists(csv_file):
             # Use pandas read_csv with python engine for more lenient parsing in the face of mixed separators.
             df = pd.read_csv(
@@ -86,10 +87,9 @@ class OrthoADataParse():
                 html_data = f.read()
                 soup = BeautifulSoup(html_data, "html.parser")
 
-            rows = self.cleanUp(soup, structure_name)                
+            rows = self.cleanUp(soup, structure_name)
 
         return rows
-
 
     def parseMulti(self, index_url, structure_name):
         """
@@ -107,7 +107,7 @@ class OrthoADataParse():
 
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if not os.path.exists(html_file):
-            print(f"[parseMulti] Index file not found: {html_file}")
+            logging.error(f"[parseMulti] Index file not found: {html_file}")
             return outdata
 
         with open(html_file, "r", encoding="utf-8") as f:
@@ -126,17 +126,17 @@ class OrthoADataParse():
                         label = nav_title.get_text(strip=True) if nav_title else None
                         journee_ids.append((jid, label))
 
-        print(f"[parseMulti] {len(journee_ids)} day types found: {[j[0] for j in journee_ids]}")
+        logging.info(f"[parseMulti] {len(journee_ids)} day types found: {[j[0] for j in journee_ids]}")
 
         # Fetch and parse each day type individually
         for jid, label in journee_ids:
             json_url = f"/planning/jt/journees/{jid}/;view?json=1"
-            print(f"[parseMulti] Parsing day type {jid} ({label})...")
+            logging.info(f"[parseMulti] Parsing day type {jid} ({label})...")
             try:
                 rows = self.parseJson(json_url, structure_name)
             except OrthoAdl.OrthoADownloadError as e:
                 # Log and skip this day type — don't abort the whole multi fetch
-                print(f"[parseMulti] Skipping day type {jid}: {e}")
+                logging.warning(f"[parseMulti] Skipping day type {jid}: {e}")
                 continue
             if rows is not None:
                 outdata[jid] = {
@@ -144,7 +144,7 @@ class OrthoADataParse():
                     "sequences": rows
                 }
 
-        print(f"[parseMulti] Done — {len(outdata)} day types parsed")
+        logging.info(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
 
     def specific_filter(self, data, structure_name):
@@ -211,16 +211,15 @@ class OrthoADataParse():
 
         return dataout
 
-
     def cleanUpCalendarEvents(self, datain, structure_name):
         events = datain["events"]
         keys = self.dataKeys.get(structure_name)
 
         #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)): 
-            print(f"Error: dataKeys for {structure_name} is not subscriptable")
+        if keys is None or not isinstance(keys, (list, tuple)):
+            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
             return []
-        
+
         # Filter data from input based on keys defined in url.yaml for this structure
         # Keep only the whitelisted columns for calendaring events.
         filtered_data = [
@@ -229,7 +228,7 @@ class OrthoADataParse():
         ]
 
         return filtered_data
-    
+
     """
     This clean up is specific to the metatypes structure, a JSON file with a specific format.
     The data cannot be retrieved with a single list of keys as they're nested, hence the parsing must be hardcoded
@@ -258,33 +257,33 @@ class OrthoADataParse():
 
         return out_struct
 
-    """ 
+    """
     Input data is a list of dicts, containing each : Nom, which is the user ID, Nom.1 = real name and Prénome.
     This clean up returns a list of dicts with only the user ID and the full name : "Prénom Nom.1"
     """
     def cleanUpUsers(self, dfin, structure_name):
         out_struct = []
         # Get the keys for this structure from the dataKeys dictionary, listed in url.yaml.
-        keys = self.dataKeys.get(structure_name)    
-        
+        keys = self.dataKeys.get(structure_name)
+
         #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)): 
-            print(f"Error: dataKeys for {structure_name} is not subscriptable")
+        if keys is None or not isinstance(keys, (list, tuple)):
+            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
             return out_struct
-        
+
         # Filter the DataFrame to keep only the columns specified in keys for this structure. This assumes that the keys are the column names in the DataFrame.
-        df_filtered = dfin.loc[:, keys] 
+        df_filtered = dfin.loc[:, keys]
 
         # If the result is a Series (which happens if there's only one column), convert it to a DataFrame to ensure consistent processing. This is necessary because the next steps expect a DataFrame structure, even if it's just one column.
-        if isinstance(df_filtered, pd.Series):  
+        if isinstance(df_filtered, pd.Series):
             # Convert the Series to a DataFrame, which will have one column with the name of the original Series.
-            df_filtered = df_filtered.to_frame() 
+            df_filtered = df_filtered.to_frame()
 
         # Convert the filtered DataFrame to a list of dictionaries, where each dictionary represents a row with column names as keys. This makes it easier to iterate over the data and extract the relevant information for each user.
         df_records = df_filtered.to_dict(orient="records")
 
         patientId = keys[0]  # Assuming the first key is the user ID
-        lastName = keys[1]  # Assuming the second key is the last name
+        lastName = keys[1]   # Assuming the second key is the last name
         firstName = keys[2]  # Assuming the third key is the first name
 
         for user in df_records:
@@ -295,9 +294,9 @@ class OrthoADataParse():
                 "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user.get(patientId)}/profile/"  # Construct the URL for the user profile
             })
         return out_struct
-    
+
     """
-    This clean up is specific to the JT2026 structure, which is an HTML table with a specific format. It extracts the relevant columns based on the keys defined in url.yaml for this structure, and returns a list of lists containing the cleaned data.    
+    This clean up is specific to the JT2026 structure, which is an HTML table with a specific format. It extracts the relevant columns based on the keys defined in url.yaml for this structure, and returns a list of lists containing the cleaned data.
     It is base don a beautiful soup object, which is passed to the cleanUp function
     """
     def cleanUpJt2026(self, soupin, structure_name):
@@ -313,8 +312,8 @@ class OrthoADataParse():
         keys = self.dataKeys.get(structure_name)
 
         #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)): 
-            print(f"Error: dataKeys for {structure_name} is not subscriptable")
+        if keys is None or not isinstance(keys, (list, tuple)):
+            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
             return out_struct
 
         # get the indexes of the columns to keep based on the headers and the keys
@@ -326,11 +325,11 @@ class OrthoADataParse():
             line = [cells[i].get_text(strip=True) for i in indexes]
             out_struct.append(line)
 
-        return out_struct 
+        return out_struct
 
     """
     This function is a generic cleanup function that calls the appropriate specific cleanup function based on the structure name.
-    It uses a dictionary of cleanup functions (cleanUpSwitch) to map structure names to their corresponding cleanup functions. 
+    It uses a dictionary of cleanup functions (cleanUpSwitch) to map structure names to their corresponding cleanup functions.
     If no specific cleanup function is defined for a structure, it returns the input data unchanged.
     """
     def cleanUp(self, datain, structure_name):
@@ -392,9 +391,9 @@ def main():
         user = next((u for u in OrthoAdata["users"] if u["name"].lower() == patient_name.lower()), None)
         if user:
             patient_id = user["id"]
-            print(f"Rendez-vous for patient {patient_name} (ID: {patient_id})")
+            logging.info(f"Rendez-vous for patient {patient_name} (ID: {patient_id})")
         else:
-            print(f"Rendez-vous for patient {patient_name} (ID: not found)")
+            logging.warning(f"Rendez-vous for patient {patient_name} (ID: not found)")
 
 if __name__ == "__main__":
     main()

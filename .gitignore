@@ -8,3 +8,4 @@ dist/downloads
 downloads
 .DS_Store
 data.json
+logs
