@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: mainProth",
+            "name": "Python: mainTest",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/mainProth.py",
+            "program": "${workspaceFolder}/mainTest.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }

@@ -24,12 +24,13 @@ class OrthoADataParse():
             self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)
         self.cleanUpSwitch = {
             "rdvs_history": self.cleanUpCsv,
-            "jt": self.cleanUpCalendarEvents,
+            "jt": self.cleanUpJourneesType,
             "metatypes": self.cleanUpMetatypes,
             "users": self.cleanUpUsers,
             "alldays2026": self.cleanUpJt2026,
             "prothesiste": self.cleanUpCsv,
-            "recette": self.cleanUpCsv
+            "recette": self.cleanUpCsv,
+            "journees_type": self.cleanUpJourneesType,
         }
         self.dataKeys = {}
 
@@ -88,35 +89,61 @@ class OrthoADataParse():
             rows = self.cleanUp(soup, structure_name)                
 
         return rows
-    
-    def parseMulti(self, html_url, structure_name):
-        outdata = None
+
+
+    def parseMulti(self, index_url, structure_name):
+        """
+        Fetches all day types from OrthoAdvance:
+        1. Downloads the index HTML page listing all day types
+        2. Extracts day type IDs from /planning/jt/journees/<n> links
+        3. For each ID, calls /planning/jt/journees/<n>/;view?json=1
+        4. Parses and aggregates results into a dict keyed by day type ID
+        """
+        outdata = {}
         htmlpage = "page_content.html"
+
         if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageHtml(html_url, htmlpage)
+            self.orthoAdl.downloadPageHtml(index_url, htmlpage)
+
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
-        if os.path.exists(html_file):
-            with open(html_file, "r", encoding="utf-8") as f:
-                html_data = f.read()
-            soup = BeautifulSoup(html_data, "html.parser")
+        if not os.path.exists(html_file):
+            print(f"[parseMulti] Index file not found: {html_file}")
+            return outdata
 
-            # Find all anchor links in the page
-            links = soup.find_all('a', href=True)
+        with open(html_file, "r", encoding="utf-8") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
 
-            # Filter and print the matching planning links and their text
-            for link in links:
-                href = link['href']
-                if 'planning/jt/journees/' in href:
-                    print(f"Link: {href}")
-                    # Search for the first integer in the URL to infer the planning day index.
-                    if type(href) == str:
-                        match = re.search(r'\d+', href)
-                        if match:
-                            last_number = int(match.group())
-                            print(last_number)  # Output: 12
+        # Extract unique day type IDs and their labels from anchor links
+        journee_ids = []  # list of (id, label) tuples
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if 'planning/preparation/jtypes/' in href:
+                match = re.search(r'/jtypes/(\d+)', href)
+                if match:
+                    jid = int(match.group(1))
+                    if jid not in [j[0] for j in journee_ids]:
+                        nav_title = link.find('span', class_='nav-title')
+                        label = nav_title.get_text(strip=True) if nav_title else None
+                        journee_ids.append((jid, label))
 
+        print(f"[parseMulti] {len(journee_ids)} day types found: {[j[0] for j in journee_ids]}")
+
+        # Fetch and parse each day type individually
+        for jid, label in journee_ids:
+            json_url = f"/planning/jt/journees/{jid}/;view?json=1"
+            print(f"[parseMulti] Parsing day type {jid} ({label})...")
+            rows = self.parseJson(json_url, structure_name)
+            if rows is not None:
+                outdata[jid] = {
+                    "label": label,
+                    "sequences": rows
+                }
+
+        print(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
     
+
+        return rows
     def specific_filter(self, data, structure_name):
         if structure_name == "rdvs_history":
             for item in data:
@@ -133,7 +160,43 @@ class OrthoADataParse():
                 )
                 item["Date du rdv"] = dt.isoformat()
         return data
-    
+
+    def cleanUpJourneesType(self, datain, structure_name):
+        """
+        Parses a journée type from /planning/jt/journees/<n>/;view?json=1
+        Extracts sequences (metatype_id → {as1, dr, as2})
+        enriched with value/color from enumerates.metatypes.list
+        """
+        sequences = datain.get("sequences", {})
+        metatypes_list = datain.get("enumerates", {}).get("metatypes", {}).get("list", [])
+
+        # Build a lookup dict of name/color by metatype_id
+        meta_info = {}
+        for meta in metatypes_list:
+            meta_id = int(meta["name"].split("/")[-1])
+            meta_info[meta_id] = {
+                "value": meta.get("value"),
+                "color": meta.get("color"),
+            }
+
+        # Build output list — one row per active metatype (at least one non-zero duration)
+        out = []
+        for key, roles in sequences.items():
+            meta_id = int(key.split("/")[-1])
+            # Skip metatypes with all-zero durations — not scheduled in this day type
+            if not any(roles.values()):
+                continue
+            row = {
+                "metatype_id": meta_id,
+                "as1": roles.get("as1", 0),
+                "dr": roles.get("dr", 0),
+                "as2": roles.get("as2", 0),
+            }
+            row.update(meta_info.get(meta_id, {"value": None, "color": None}))
+            out.append(row)
+
+        return out
+
     def cleanUpCsv(self, dfin, structure_name):
         keys = self.dataKeys.get(structure_name)
         df_filtered = dfin.loc[:, dfin.columns.intersection(keys)]
@@ -274,7 +337,7 @@ class OrthoADataParse():
 """
 Get all data from OrthoAdvance, parse it and save it in a structured format (e.g. CSV, JSON, database)
 """
-def extract(urlFile="url.yaml"):    # Configure download folder path and clear as needed
+def extract(urlFile="OrthoABase/url.yaml"):    # Configure download folder path and clear as needed
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
         DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage
@@ -312,7 +375,7 @@ def extract(urlFile="url.yaml"):    # Configure download folder path and clear a
 
     return parsed_data
 
-if __name__ == "__main__":
+def main():
     OrthoAdata = extract()
     with open("data.json", "w") as f:
         json.dump(OrthoAdata, f, indent=2)
@@ -325,3 +388,6 @@ if __name__ == "__main__":
             print(f"Rendez-vous for patient {patient_name} (ID: {patient_id})")
         else:
             print(f"Rendez-vous for patient {patient_name} (ID: not found)")
+
+if __name__ == "__main__":
+    main()
