@@ -142,8 +142,6 @@ class OrthoADataParse():
         print(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
     
-
-        return rows
     def specific_filter(self, data, structure_name):
         if structure_name == "rdvs_history":
             for item in data:
