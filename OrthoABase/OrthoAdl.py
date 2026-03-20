@@ -26,7 +26,7 @@ class OrthoAdl():
     def __init__(self, download_dir, no_dl=False):
         self.no_dl = no_dl
         self.download_dir = download_dir
-        # Charge YAML configuration file
+        # Load YAML configuration file
         with open("OrthoABase/config.yaml", "r") as file:
             config = yaml.safe_load(file)
         # Get the connection values
@@ -55,7 +55,7 @@ class OrthoAdl():
 
     def connect(self, download_dir):
         print(f"Connecting to OrthoAdvance at {datetime.now().strftime('%H:%M:%S')}...")
-        # Configurer Chrome options for downloads
+        # Configure Chrome options for downloads
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("--headless")  # Hidden mode. Comment to show the browser
         chrome_options.add_argument("--disable-gpu")  # Needed for some Chrome versions
@@ -104,7 +104,7 @@ class OrthoAdl():
         login_button.click()
 
         print(f"Login submitted at {datetime.now().strftime('%H:%M:%S')}...")
-        # 6. Attendre la page principale après la connexion
+        # 6. Wait for main page after login
         WebDriverWait(self.driver, 10).until(
             lambda d: (
 #                d.execute_script("return document.readyState") == "complete" and
@@ -149,8 +149,8 @@ class OrthoAdl():
 
     def wait_for_download(self, file_extension, timeout=60):
         """
-        Attend qu'un fichier soit complètement téléchargé dans download_dir.
-        Retourne le chemin du fichier téléchargé.
+        Wait until a file is completely downloaded in download_dir.
+        Returns the path of downloaded file.
         """
 
         start_time = time.time()
@@ -180,10 +180,10 @@ class OrthoAdl():
         print(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
         driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
 
-        # Wait for the page to charge
+        # Wait for the page to load
         time.sleep(2)
 
-        # Récupérer le HTML de la page
+        # Retrieve the page HTML
         html = driver.page_source
 
         # Save to file
@@ -222,7 +222,7 @@ class OrthoAdl():
             self.driver.quit()
 
 def run():
-    # Configurer le dossier de téléchargement
+    # Setup the download directory and clear existing files if any
     download_dir = os.path.abspath("downloads")
     if os.path.exists(download_dir):
         for entry in os.listdir(download_dir):

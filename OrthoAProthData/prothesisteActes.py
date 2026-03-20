@@ -42,11 +42,11 @@ class App(ctk.CTk):
 
     def show_loading(self):
 
-        # Désactive table
+        # Disable table content while loading
         for row in self.tree.get_children():
             self.tree.delete(row)
 
-        # Overlay
+        # Loading overlay
         self.loading_frame = ctk.CTkFrame(self)
         self.loading_frame.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -79,6 +79,7 @@ class App(ctk.CTk):
 
         for line in self.full_data:
             patient_name = line.get("Patient", "")
+            # Map each patient in the act list to a URL from patient lookup table by case-insensitive name match
             for id in self.patientIds:
                 if id["name"].lower() == patient_name.lower():
                     line["url"] = f"{self.click_str}{id['url']}"
@@ -97,7 +98,7 @@ class App(ctk.CTk):
         print(f"Data processing complete at {datetime.now().strftime('%H:%M:%S')}. Table populated with {len(self.filtered_data)} records.")
         
     # =========================
-    # Filtres
+    # Filters
     # =========================
     def create_filters(self):
 
@@ -123,7 +124,7 @@ class App(ctk.CTk):
         )
         self.acte_button.pack(side="left", padx=10)
 
-        # Bouton Envoi Aujourd'hui
+        # Activate/deactivate the "sent today" filter button UI
         self.today_tx_button = ctk.CTkButton(
             frame,
             text="Envoi Aujourd'hui",
@@ -133,7 +134,7 @@ class App(ctk.CTk):
         self.today_tx_button.pack(side="left", padx=10)
         self.default_today_color = self.today_tx_button.cget("fg_color")
 
-        # Bouton Reception Aujourd'hui
+        # Activate/deactivate the "received today" filter button UI
         self.today_rx_button = ctk.CTkButton(
             frame,
             text="Reception Aujourd'hui",
@@ -142,7 +143,7 @@ class App(ctk.CTk):
         )
         self.today_rx_button.pack(side="left", padx=10)
 
-        # Bouton Rafraîchir
+        # Refresh button container label
         self.refresh_button = ctk.CTkButton(
             frame,
             text="Rafraîchir",
@@ -176,16 +177,16 @@ class App(ctk.CTk):
             set(d["Acte prothésiste"] for d in self.full_data)
         )
 
-        # Mise à jour combo prothésiste
+        # Update prosthetist dropdown values
         self.proth_filter.configure(
             values=["Tous"] + proth_values
         )
 
-        # Mise à jour liste actes
+        # Update acts list cache
         self.acte_values = acte_values
         
     # =========================
-    # Menu couleurs
+    # Color manager menu
     # =========================
     def open_color_manager(self):
 
@@ -194,11 +195,11 @@ class App(ctk.CTk):
         self.color_window.geometry("450x550")
         self.color_window.grab_set()
 
-        # ===== FRAME PRINCIPALE =====
+        # ===== MAIN FRAME =====
         main_frame = tk.Frame(self.color_window)
         main_frame.pack(fill="both", expand=True)
 
-        # ===== CANVAS SCROLLABLE =====
+        # ===== SCROLLABLE CANVAS =====
         canvas = tk.Canvas(main_frame)
         scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
 
@@ -215,8 +216,9 @@ class App(ctk.CTk):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # ===== SCROLL MOLETTE SOURIS =====
+        # ===== MOUSE WHEEL SCROLL =====
         def _on_mousewheel(event):
+            """Normalize mouse wheel events across platforms."""
             system = platform.system()
 
             if system == "Windows":
@@ -225,21 +227,21 @@ class App(ctk.CTk):
             elif system == "Darwin":
                 canvas.yview_scroll(int(-1 * event.delta / 2), "units")
 
-            else:  # Linux
+            else:  # Linux scroll bindings
                 if event.num == 4:
                     canvas.yview_scroll(-1, "units")
                 elif event.num == 5:
                     canvas.yview_scroll(1, "units")
 
 
-        # Windows & Mac
+        # Windows & macOS scroll bindings
         canvas.bind("<MouseWheel>", _on_mousewheel)
 
-        # Linux
+        # Linux scroll bindings
         canvas.bind("<Button-4>", _on_mousewheel)
         canvas.bind("<Button-5>", _on_mousewheel)
 
-        # ===== CONTENU =====
+        # ===== CONTENT =====
         self.temp_colors = COLOR_MAP.copy()
         self.color_squares = {}
 
@@ -266,7 +268,7 @@ class App(ctk.CTk):
 
             self.color_squares[acte] = square
 
-        # ===== BOUTONS FIXES EN BAS =====
+        # ===== BOTTOM FIXED BUTTONS =====
         button_frame = tk.Frame(self.color_window)
         button_frame.pack(fill="x", pady=10)
 
@@ -282,7 +284,7 @@ class App(ctk.CTk):
             title=f"Choisir couleur pour {acte}"
         )
 
-        if color_code[1]:  # si pas annulé
+        if color_code[1]:  # if not cancelled
             self.temp_colors[acte] = color_code[1]
             self.color_squares[acte].configure(bg=color_code[1])
                 
@@ -302,7 +304,7 @@ class App(ctk.CTk):
 
         self.color_window.destroy()
 
-        # Recharger couleurs dans table
+        # Reload table colors after save and close color editor
         self.populate_table()
 
     # =========================
@@ -375,7 +377,7 @@ class App(ctk.CTk):
             self.tree.column(col, width=ww, anchor="center")
 
     # =========================
-    # Remplissage table
+    # Table populate
     # =========================
     def populate_table(self):
 
@@ -410,14 +412,14 @@ class App(ctk.CTk):
 
             item_id = self.tree.insert("", "end", values=values, tags=(tag,))
 
-            # Couleur acte
+            # Apply color per act taxon
             if tag in COLOR_MAP:
                 self.tree.tag_configure(tag, background=COLOR_MAP[tag])
             else:
                 COLOR_MAP[tag] = "#FFFFFF"
                 self.tree.tag_configure(tag, background=COLOR_MAP[tag])
 
-            # Hauteur dynamique
+            # Dynamic row height based on comment lines
             row_height = 25 #+ (max_lines - 1) * 18
             self.tree.item(item_id)
             self.tree.configure(style="Custom.Treeview")
@@ -425,7 +427,7 @@ class App(ctk.CTk):
             style = ttk.Style()
             style.configure("Custom.Treeview", rowheight=row_height)
 
-        # Mise à jour compteur
+        # Update row counter label
         self.counter_label.configure(
             text=f"{len(self.filtered_data)} élément(s)"
         )
@@ -443,7 +445,7 @@ class App(ctk.CTk):
         values = self.tree.item(item_id)["values"]
         tags = self.tree.item(item_id)["tags"]
 
-        # Couleur associée à l'acte
+        # Fetch background color linked to act
         bg_color = None
         if tags:
             acte = tags[0]
@@ -460,7 +462,7 @@ class App(ctk.CTk):
         detail.title("Détail de l'événement")
         detail.geometry("600x500")
 
-        # Bloquant (modal)
+        # Block input to parent window (modal)
         detail.grab_set()
         detail.focus()
         detail.transient(self)
@@ -468,16 +470,16 @@ class App(ctk.CTk):
         if bg_color:
             detail.configure(fg_color=bg_color)
 
-        # Frame principale
+        # Main frame for detail view
         frame = ctk.CTkFrame(detail, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        # Zone texte scrollable
+        # Scrollable text box for details
         textbox = ctk.CTkTextbox(frame, wrap="word")
         textbox.pack(fill="both", expand=True)
 
-        # Construire le texte avec le nom des colonnes
-        columns = self.tree["columns"]  # récupère toutes les colonnes
+        # Build display text with column names
+        columns = self.tree["columns"]  # retrieve all column names
         content_lines = []
         for col, val in zip(columns, values):
             content_lines.append(f"{col}: {val}")
@@ -486,7 +488,7 @@ class App(ctk.CTk):
         textbox.insert("1.0", content)
         textbox.configure(state="disabled")
 
-        # Bouton fermer
+        # Close button
         close_button = ctk.CTkButton(
             frame,
             text="Fermer",
@@ -494,12 +496,12 @@ class App(ctk.CTk):
         )
         close_button.pack(pady=15)
 
-        # Attente fermeture (vraiment bloquant)
+        # Wait until details window is closed
         self.wait_window(detail)
 
 
     # =========================
-    # Refresh
+    # Refresh controls
     # =========================
     def refresh(self):
         print(f"Refreshing data at {datetime.now().strftime('%H:%M:%S')}...")
@@ -507,7 +509,7 @@ class App(ctk.CTk):
         self.after(100, self.load_data)
 
     # =========================
-    # Toggle Envoi Aujourd'hui
+    # Toggle "sent today" filter
     # =========================
     def toggle_today_tx_filter(self):
 
@@ -522,7 +524,7 @@ class App(ctk.CTk):
         self.apply_filters()
 
     # =========================
-    # Toggle Réception Aujourd'hui
+    # Toggle "received today" filter
     # =========================
     def toggle_today_rx_filter(self):
 
@@ -537,7 +539,7 @@ class App(ctk.CTk):
         self.apply_filters()
 
     # =========================
-    # Menu multi-actes
+    # Multi-act selection menu
     # =========================
     def open_acte_menu(self):
 
@@ -624,7 +626,7 @@ class App(ctk.CTk):
         self.apply_filters()
 
     # =========================
-    # Application filtres
+    # Apply filters to data set
     # =========================
     def apply_filters(self, _=None):
 
@@ -644,11 +646,13 @@ class App(ctk.CTk):
                 continue
 
             if self.today_tx_filter_active:
+                # Only include rows sent to lab today
                 my_date = datetime.strptime(row["Date d'envoi au labo"], "%d/%m/%Y").date()
                 if my_date.isoformat() != today_str:
                     continue
 
             if self.today_rx_filter_active:
+                # Only include rows received today
                 my_date = datetime.strptime(row["Date de réception"], "%d/%m/%Y").date()
                 if my_date.isoformat() != today_str:
                     continue
@@ -659,15 +663,15 @@ class App(ctk.CTk):
         self.populate_table()
 
     # =========================
-    # Tri colonnes
+    # Column sorting
     # =========================
     def sort_column(self, col):
 
-        # Si on reclique la même colonne → on inverse
+        # If the same column is clicked again, reverse sorting order
         if self.current_sort_column == col:
             self.current_sort_reverse = not self.current_sort_reverse
         else:
-            # Nouvelle colonne → tri croissant par défaut
+            # New column clicked -> default to ascending sort
             self.current_sort_column = col
             self.current_sort_reverse = False
 
@@ -682,6 +686,7 @@ class App(ctk.CTk):
         col = self.current_sort_column
 
         def try_parse(value):
+            """Convert values for stable sorting by date/numeric/text."""
 
             if col in ["Date d'envoi au labo", "Date de réception"]:
                 try:
@@ -709,7 +714,7 @@ def main():
     app.mainloop()
 
 # =========================
-# Lancement
+# Launch
 # =========================
 if __name__ == "__main__":
     main()

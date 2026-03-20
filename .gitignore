@@ -5,7 +5,6 @@ TestFiles
 __pycache__
 build
 dist/downloads
-mainProth.spec
 downloads
 OrthoARecettes/discord_webhook.txt
 dist/OrthoARecettes/discord_webhook.txt

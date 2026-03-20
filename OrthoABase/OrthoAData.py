@@ -44,14 +44,14 @@ class OrthoADataParse():
             csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
         print(f"Looking for CSV file at {csv_file}")
         if os.path.exists(csv_file):
-#            df = pd.read_csv(csv_file, encoding="utf-8")
+            # Use pandas read_csv with python engine for more lenient parsing in the face of mixed separators.
             df = pd.read_csv(
                 csv_file,
                 encoding="utf-8",
                 sep=None,
                 quotechar='"',
-                quoting=csv.QUOTE_ALL,   # ou QUOTE_MINIMAL selon ton fichier
-                engine="python"          # plus tolérant que le moteur C
+                quoting=csv.QUOTE_ALL,   # or QUOTE_MINIMAL depending on your file
+                engine="python"          # more tolerant than C engine
             ).fillna("")
 
             rows = self.cleanUp(df, structure_name)
@@ -100,24 +100,20 @@ class OrthoADataParse():
                 html_data = f.read()
             soup = BeautifulSoup(html_data, "html.parser")
 
-                        # Trouver tous les liens
+            # Find all anchor links in the page
             links = soup.find_all('a', href=True)
 
-            # Filtrer et afficher les liens et le texte associé
+            # Filter and print the matching planning links and their text
             for link in links:
                 href = link['href']
                 if 'planning/jt/journees/' in href:
-                    print(f"Lien: {href}")
-                    # Search for the first integer in the string
+                    print(f"Link: {href}")
+                    # Search for the first integer in the URL to infer the planning day index.
                     if type(href) == str:
                         match = re.search(r'\d+', href)
                         if match:
                             last_number = int(match.group())
                             print(last_number)  # Output: 12
-
-                
-
-                    #outdata = self.cleanUp(soup, structure_name)                
 
         return outdata
     
@@ -150,9 +146,6 @@ class OrthoADataParse():
         return dataout
 
 
-    """
-
-    """
     def cleanUpCalendarEvents(self, datain, structure_name):
         events = datain["events"]
         keys = self.dataKeys.get(structure_name)
@@ -163,6 +156,7 @@ class OrthoADataParse():
             return []
         
         # Filter data from input based on keys defined in url.yaml for this structure
+        # Keep only the whitelisted columns for calendaring events.
         filtered_data = [
             {k: d[k] for k in keys if k in d}
             for d in events
@@ -280,7 +274,7 @@ class OrthoADataParse():
 """
 Get all data from OrthoAdvance, parse it and save it in a structured format (e.g. CSV, JSON, database)
 """
-def extract(urlFile="url.yaml"):    # Configurer le dossier de téléchargement
+def extract(urlFile="url.yaml"):    # Configure download folder path and clear as needed
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
         DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage
@@ -331,4 +325,3 @@ if __name__ == "__main__":
             print(f"Rendez-vous for patient {patient_name} (ID: {patient_id})")
         else:
             print(f"Rendez-vous for patient {patient_name} (ID: not found)")
-    #print(OrthoAdata)
