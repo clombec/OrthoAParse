@@ -6,7 +6,5 @@ __pycache__
 build
 dist/downloads
 downloads
-OrthoARecettes/discord_webhook.txt
-dist/OrthoARecettes/discord_webhook.txt
 .DS_Store
 data.json

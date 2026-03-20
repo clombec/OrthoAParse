@@ -3,3 +3,6 @@ connexion:
   url: "xxxx-app"
   login: "xxx.xxx@xxx.xx"
   pwd: "xxxxxx"
+
+discord:
+  webhook: ""  # Paste your Discord webhook URL here, or leave empty — the app will ask on first launch
