@@ -28,6 +28,10 @@ class App(ctk.CTk):
         self.full_data = []
         self.filtered_data = []
 
+        # Color and column maps — loaded from Configuration.yaml in load_data()
+        self.color_map = {}
+        self.column_map = {}
+
         self.selected_actes = set()
         self.sort_reverse = False
         self.today_tx_filter_active = False
@@ -106,10 +110,9 @@ class App(ctk.CTk):
     def load_data(self):
 
         with open("OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
-            global COLOR_MAP, COLUMN_MAP
             yamlconfig = yaml.safe_load(f)
-            COLOR_MAP = yamlconfig.get("colors", {})
-            COLUMN_MAP = yamlconfig.get("columns", {})
+            self.color_map = yamlconfig.get("colors", {})
+            self.column_map = yamlconfig.get("columns", {})
 
         try:
             data = OrthoAData.extract(
@@ -294,7 +297,7 @@ class App(ctk.CTk):
         canvas.bind("<Button-5>", _on_mousewheel)
 
         # ===== CONTENT =====
-        self.temp_colors = COLOR_MAP.copy()
+        self.temp_colors = self.color_map.copy()
         self.color_squares = {}
 
         for acte in sorted(self.temp_colors.keys()):
@@ -342,15 +345,13 @@ class App(ctk.CTk):
 
     def save_colors(self):
 
-        global COLOR_MAP, COLUMN_MAP
-
-        COLOR_MAP = self.temp_colors.copy()
-        #COLUMN_MAP = self.temp_columns.copy()
+        self.color_map = self.temp_colors.copy()
+        #self.column_map = self.temp_columns.copy()
 
         with open("OrthoAProthData/configuration.yaml", "w", encoding="utf-8") as f:
             config = {
-                "colors": COLOR_MAP,
-                "columns": COLUMN_MAP
+                "colors": self.color_map,
+                "columns": self.column_map
             }
             yaml.dump(config, f, allow_unicode=True)
 
@@ -410,7 +411,6 @@ class App(ctk.CTk):
                 webbrowser.open(value)
 
     def setup_columns(self):
-        global COLUMN_MAP
 
         if not self.full_data:
             return
@@ -425,7 +425,7 @@ class App(ctk.CTk):
                 text=col,
                 command=lambda c=col: self.sort_column(c)
             )
-            ww = COLUMN_MAP.get(col, {}).get("width", 170)
+            ww = self.column_map.get(col, {}).get("width", 170)
             self.tree.column(col, width=ww, anchor="center")
 
     # =========================
@@ -465,11 +465,11 @@ class App(ctk.CTk):
             item_id = self.tree.insert("", "end", values=values, tags=(tag,))
 
             # Apply color per act taxon
-            if tag in COLOR_MAP:
-                self.tree.tag_configure(tag, background=COLOR_MAP[tag])
+            if tag in self.color_map:
+                self.tree.tag_configure(tag, background=self.color_map[tag])
             else:
-                COLOR_MAP[tag] = "#FFFFFF"
-                self.tree.tag_configure(tag, background=COLOR_MAP[tag])
+                self.color_map[tag] = "#FFFFFF"
+                self.tree.tag_configure(tag, background=self.color_map[tag])
 
             # Dynamic row height based on comment lines
             row_height = 25 #+ (max_lines - 1) * 18
@@ -501,7 +501,7 @@ class App(ctk.CTk):
         bg_color = None
         if tags:
             acte = tags[0]
-            bg_color = COLOR_MAP.get(acte, None)
+            bg_color = self.color_map.get(acte, None)
 
         self.open_detail_window(values, bg_color)
 
