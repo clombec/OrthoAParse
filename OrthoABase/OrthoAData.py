@@ -203,7 +203,10 @@ class OrthoADataParse():
 
     def cleanUpCsv(self, dfin, structure_name):
         keys = self.dataKeys.get(structure_name)
-        df_filtered = dfin.loc[:, dfin.columns.intersection(keys)]
+        if keys is None:
+            df_filtered = dfin  # no keys defined — keep all columns
+        else:
+            df_filtered = dfin.loc[:, dfin.columns.intersection(keys)]
 
         if isinstance(df_filtered, pd.Series):
             df_filtered = df_filtered.to_frame()
