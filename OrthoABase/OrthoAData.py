@@ -32,6 +32,7 @@ class OrthoADataParse():
             "prothesiste": self.cleanUpCsv,
             "recette": self.cleanUpCsv,
             "journees_type": self.cleanUpJourneesType,
+            "stat_periodes": self.cleanUpCsv,
         }
         self.dataKeys = {}
 

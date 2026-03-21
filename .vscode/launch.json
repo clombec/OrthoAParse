@@ -2,11 +2,48 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: mainTest",
+            // DEFAULT (F5) — launch the main application
+            "name": "OrthoAProth — launch",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/mainTest.py",
-            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/mainProth.py",
+            "justMyCode": true
+        },
+        {
+            // Run all tests with pytest
+            "name": "pytest — all tests",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/",
+                "-v"
+            ],
+            "justMyCode": true
+        },
+        {
+            // Run only the currently open test file
+            "name": "pytest — current file",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-v"
+            ],
+            "justMyCode": true
+        },
+        {
+            // Run a single test by name — edit the -k value as needed
+            "name": "pytest — single test",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/",
+                "-v",
+                "-k", "test_extract_data"
+            ],
             "justMyCode": true
         }
     ]

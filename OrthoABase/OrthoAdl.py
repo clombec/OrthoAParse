@@ -146,6 +146,8 @@ class OrthoAdl():
                 lambda d: (
                     d.find_element(By.CSS_SELECTOR, 'button[name="action"][value="export_as_csv"]')
                     if d.find_elements(By.CSS_SELECTOR, 'button[name="action"][value="export_as_csv"]')
+                    else d.find_element(By.CSS_SELECTOR, 'a.btn.btn-link[href*="csv"]')
+                    if d.find_elements(By.CSS_SELECTOR, 'a.btn.btn-link[href*="csv"]')
                     else d.find_element(By.XPATH, "//button[normalize-space()='Exporter au format CSV']")
                 )
             )
@@ -224,6 +226,7 @@ class OrthoAdl():
         # Access the page and download text content
         driver = self.driver
         logging.info(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
+        driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
 
         try:
             # Wait for page to load
