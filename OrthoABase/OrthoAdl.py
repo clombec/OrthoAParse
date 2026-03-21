@@ -81,7 +81,17 @@ class OrthoAdl():
             chrome_options.add_experimental_option("prefs", prefs)
 
             # Initialize Chrome driver
-            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+            try:
+                self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+            except Exception:
+                # ChromeDriver cache may be stale (e.g. after a Chrome update) — force re-download and retry once
+                logging.warning("ChromeDriver failed to start — clearing cache and retrying...")
+                ChromeDriverManager().install.__func__  # flush not needed, just reinstall with cache_valid=0
+                self.driver = webdriver.Chrome(
+                    service=Service(ChromeDriverManager(cache_valid_range=0).install()),
+                    options=chrome_options
+                )
+
             logging.info("Chrome driver initialized.")
             # 1. Access the user selection page
             connect_url = f"{self.OrthoAUrlBase}/#!/login/connect"
