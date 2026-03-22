@@ -263,6 +263,10 @@ class OrthoAdl():
         if not self.no_dl:
             self.driver.quit()
 
+
+"""
+local run function for testing purposes. Not intended for production use.
+"""
 def run():
     # Setup the download directory and clear existing files if any
     download_dir = os.path.abspath("downloads")

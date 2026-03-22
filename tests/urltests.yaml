@@ -1,5 +1,4 @@
-# Unused file. This file is meant to be a template for the urls and keys to download the data.
-# You should create a url.yaml file with the same structure and fill in the values with your own urls and keys.
+#Contains all urls used by the project. Verify that all of them are downloadableand parseable.
 
 rdvs_history:
   url: "rdvs/rdvs/history"

@@ -148,23 +148,6 @@ class OrthoADataParse():
         logging.info(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
 
-    def specific_filter(self, data, structure_name):
-        if structure_name == "rdvs_history":
-            for item in data:
-                dt = datetime.strptime(
-                    item.pop("Date et heure du RDV"),
-                    "%d/%m/%Y %Hh%M"
-                )
-                item["Date et heure du RDV"] = dt.isoformat()
-
-        if structure_name == "prothesiste":
-            for item in data:
-                dt = datetime.fromisoformat(
-                    item.pop("Date du rdv"),
-                )
-                item["Date du rdv"] = dt.isoformat()
-        return data
-
     def cleanUpJourneesType(self, datain, structure_name):
         """
         Parses a journée type from /planning/jt/journees/<n>/;view?json=1
@@ -201,19 +184,35 @@ class OrthoADataParse():
 
         return out
 
+
     def cleanUpCsv(self, dfin, structure_name):
         keys = self.dataKeys.get(structure_name)
         if keys is None:
             df_filtered = dfin  # no keys defined — keep all columns
         else:
+            # Keep only columns defined in keys
             df_filtered = dfin.loc[:, dfin.columns.intersection(keys)]
 
         if isinstance(df_filtered, pd.Series):
             df_filtered = df_filtered.to_frame()
 
-        dataout = self.specific_filter(df_filtered.to_dict(orient="records"), structure_name)
+        data = df_filtered.to_dict(orient="records")
 
-        return dataout
+        if structure_name == "rdvs_history":
+            for item in data:
+                dt = datetime.strptime(
+                    item.pop("Date et heure du RDV"),
+                    "%d/%m/%Y %Hh%M"
+                )
+                item["Date et heure du RDV"] = dt.isoformat()
+
+        if structure_name == "prothesiste":
+            for item in data:
+                dt = datetime.fromisoformat(
+                    item.pop("Date du rdv"),
+                )
+                item["Date du rdv"] = dt.isoformat()
+        return data
 
     def cleanUpCalendarEvents(self, datain, structure_name):
         events = datain["events"]
