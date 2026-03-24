@@ -45,8 +45,13 @@ def rotate_if_needed(log_path):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         archived_name = f"OrthoAProth_{timestamp}.log"
         archived_path = os.path.join(os.path.dirname(log_path), archived_name)
-        os.rename(log_path, archived_path)
-        print(f"[OrthoALogger] Log file exceeded 500 KB — archived as {archived_name}")
+        try:
+            os.rename(log_path, archived_path)
+            print(f"[OrthoALogger] Log file exceeded 500 KB — archived as {archived_name}")
+        except PermissionError:
+            # Log file is held open by another process (e.g. OrthoAProth running in parallel)
+            # Skip rotation — will retry on next startup
+            print(f"[OrthoALogger] Could not rotate log file — skipping (file in use).")
 
 
 def setup_logger():

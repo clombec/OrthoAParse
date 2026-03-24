@@ -7,6 +7,7 @@ import yaml
 import tkinter as tk
 from tkinter import messagebox
 from datetime import datetime
+import time
 
 CONFIG_PATH = "OrthoABase/config.yaml"
 
@@ -93,10 +94,7 @@ def ask_webhook_gui():
     root.mainloop()
     return result["url"]
 
-
-def main():
-    OrthoALogger.setup_logger()
-
+def run():
     try:
         data = OrthoAData.extract(
             "OrthoARecettes/recettes.yaml"
@@ -141,6 +139,29 @@ def main():
         logging.error(f"Erreur HTTP Discord (webhook invalide ?) : {e}")
     except requests.exceptions.RequestException as e:
         logging.error(f"Erreur lors de l'envoi Discord : {e}")
+
+def main(oneshot=True):
+
+    OrthoALogger.setup_logger()
+
+    if oneshot:
+        run()
+    else:
+        run() # run once immediately on startup before entering the schedule loop
+        logging.info("Démarrage en mode planifié (toutes les heures de 9h à 19h).")
+        while True:
+            now = datetime.now()
+            if 8 <= now.hour < 19:
+                logging.info(f"Exécution programmée à {now.strftime('%H:%M:%S')}")
+                run()
+            else:
+                logging.info(f"Hors des heures de travail ({now.strftime('%H:%M')}) — exécution ignorée.")
+            
+            # Attendre jusqu'au prochain passage à l'heure suivante
+            minutes_to_wait = 60 - now.minute
+            seconds_to_wait = minutes_to_wait * 60 - now.second
+            logging.info(f"Prochaine exécution dans {minutes_to_wait} min.")
+            time.sleep(seconds_to_wait)
 
 # =========================
 # Start
