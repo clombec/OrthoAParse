@@ -22,7 +22,7 @@ class App(ctk.CTk):
 
         self.title("Actes Prothésiste")
         self.geometry("900x500")
-        self.iconbitmap("OrthoAProth.ico")
+        self.after(0, lambda: self.wm_iconbitmap("OrthoAProthData/OrthoAProth.ico"))
         self.click_str = "▶▶ Ouvrir dans OrthoAdvance "
 
         self.full_data = []
@@ -767,6 +767,14 @@ class App(ctk.CTk):
 
 def main():
     OrthoALogger.setup_logger()
+
+    # Set AppUserModelID so Windows taskbar shows the correct icon
+    try:
+        from ctypes import windll
+        windll.shell32.SetCurrentProcessExplicitAppUserModelID("OrthoAProth")
+    except Exception:
+        pass  # non-Windows — ignore silently
+
     app = App()
     app.mainloop()
 
