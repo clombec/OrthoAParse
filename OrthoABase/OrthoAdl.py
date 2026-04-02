@@ -130,11 +130,12 @@ class OrthoAdl():
             # 6. Wait for main page after login
             WebDriverWait(self.driver, 10).until(
                 lambda d: (
-#                d.execute_script("return document.readyState") == "complete" and
+                d.execute_script("return document.readyState") == "complete" and
                     d.current_url != connect_url
                 )
             )
             logging.info("Login successful.")
+            time.sleep(2)  # Wait a bit for any post-login redirects or loads
 
         except Exception as e:
             raise OrthoAConnectionError(
