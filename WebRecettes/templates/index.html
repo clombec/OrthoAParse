@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>OrthoARecettes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 40px;
+        }
+        form button {
+            padding: 16px 40px;
+            font-size: 18px;
+            background-color: #4A90D9;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        form button:hover:not(:disabled) {
+            background-color: #357ABD;
+        }
+        form button:disabled {
+            background-color: #aaaaaa;
+            cursor: not-allowed;
+        }
+        .message {
+            margin-top: 30px;
+            font-size: 16px;
+            padding: 12px 24px;
+            border-radius: 6px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error   { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+
+    <h1>OrthoAR</h1>
+
+    <form action="/recettes" method="post" onsubmit="onSubmit(this)">
+        <button type="submit" id="btn">Envoyer</button>
+    </form>
+
+    {% if message %}
+        <div class="message {{ message[0] }}">{{ message[1] }}</div>
+    {% endif %}
+
+    <script>
+        function onSubmit(form) {
+            const btn = document.getElementById("btn");
+            btn.disabled = true;
+            btn.textContent = "Envoi en cours...";
+        }
+    </script>
+
+</body>
+</html>

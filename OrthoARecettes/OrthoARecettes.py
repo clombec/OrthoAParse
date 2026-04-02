@@ -101,13 +101,13 @@ def run():
         )
     except OrthoAdl.OrthoAConnectionError as e:
         logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
-        return
+        return 0
     except OrthoAdl.OrthoADownloadError as e:
         logging.error(f"Erreur de téléchargement : {e}")
-        return
+        return 0
     except Exception as e:
         logging.error(f"Erreur inattendue lors de la récupération des données : {e}")
-        return
+        return 0
 
     total = 0
     for line in data["recette"]:
@@ -126,7 +126,7 @@ def run():
 
     if not webhook_url:
         logging.warning("Webhook Discord non configuré — envoi ignoré.")
-        return
+        return total
 
     payload = {"content": f"RX @ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}: {total:.2f}"}
     try:
@@ -140,20 +140,22 @@ def run():
     except requests.exceptions.RequestException as e:
         logging.error(f"Erreur lors de l'envoi Discord : {e}")
 
+    return total
+
 def main(oneshot=True):
 
     OrthoALogger.setup_logger()
 
     if oneshot:
-        run()
+        return run()
     else:
-        run() # run once immediately on startup before entering the schedule loop
+        _ = run() # run once immediately on startup before entering the schedule loop
         logging.info("Démarrage en mode planifié (toutes les heures de 9h à 19h).")
         while True:
             now = datetime.now()
             if 8 <= now.hour < 19:
                 logging.info(f"Exécution programmée à {now.strftime('%H:%M:%S')}")
-                run()
+                _ = run()
             else:
                 logging.info(f"Hors des heures de travail ({now.strftime('%H:%M')}) — exécution ignorée.")
             

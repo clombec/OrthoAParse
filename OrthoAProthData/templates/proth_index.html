@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Actes Prothésiste</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='OrthoAProth.ico') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .filters {
+            padding: 20px;
+            background: #ecf0f1;
+            border-bottom: 1px solid #bdc3c7;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        select, button {
+            padding: 8px 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            background: white;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button.active {
+            background: #27ae60;
+        }
+        .counter {
+            margin-left: auto;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        th {
+            background: #34495e;
+            color: white;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background: #2c3e50;
+        }
+        th.sort-asc::after {
+            content: " ▲";
+        }
+        th.sort-desc::after {
+            content: " ▼";
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .url-link {
+            color: #3498db;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .url-link:hover {
+            text-decoration: underline;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .acte-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        .acte-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .color-manager {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .color-square {
+            width: 30px;
+            height: 20px;
+            border: 1px solid #000;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Actes Prothésiste</h1>
+        </div>
+
+        <div class="error" id="error-message"></div>
+
+        <div class="filters">
+            <div class="filter-row">
+                <select id="proth-filter">
+                    {% for proth in proth_values %}
+                    <option value="{{ proth }}">{{ proth }}</option>
+                    {% endfor %}
+                </select>
+
+                <button id="acte-button">Choisir actes</button>
+
+                <button id="today-tx-filter">Envoi Aujourd'hui</button>
+                <button id="today-rx-filter">Reception Aujourd'hui</button>
+
+                <button id="refresh-btn">Rafraîchir</button>
+                <button id="color-btn">Couleurs actes</button>
+
+                <div class="counter" id="counter">0 élément(s)</div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            Récupération des données...
+        </div>
+
+        <div class="table-container">
+            <table id="data-table">
+                <thead id="table-head">
+                    <!-- Headers will be populated by JavaScript -->
+                </thead>
+                <tbody id="table-body">
+                    <!-- Data will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Acte Selection Modal -->
+    <div class="modal" id="acte-modal">
+        <div class="modal-content">
+            <span class="close" id="acte-close">&times;</span>
+            <h2>Sélection des actes</h2>
+            <div class="acte-selection" id="acte-list">
+                <!-- Checkboxes will be populated by JavaScript -->
+            </div>
+            <div style="margin-top: 20px;">
+                <button id="select-all-actes">Tout sélectionner</button>
+                <button id="deselect-all-actes">Tout désélectionner</button>
+                <button id="validate-actes" style="float: right;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Color Manager Modal -->
+    <div class="modal" id="color-modal">
+        <div class="modal-content">
+            <span class="close" id="color-close">&times;</span>
+            <h2>Gestion des couleurs des actes</h2>
+            <div class="color-manager" id="color-list">
+                <!-- Color items will be populated by JavaScript -->
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button id="save-colors">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal" id="detail-modal">
+        <div class="modal-content">
+            <span class="close" id="detail-close">&times;</span>
+            <h2>Détail de l'événement</h2>
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedActes = new Set();
+        let currentSortColumn = null;
+        let currentSortReverse = false;
+        let prothValues = {{ proth_values|tojson }};
+        let colorMap = {{ color_map|tojson }};
+        let acteValues = {{ acte_values|tojson }};
+        let columns = {{ columns|tojson }};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTable();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Filter controls
+            document.getElementById('proth-filter').addEventListener('change', applyFilters);
+            document.getElementById('acte-button').addEventListener('click', openActeModal);
+            document.getElementById('today-tx-filter').addEventListener('click', toggleTodayTxFilter);
+            document.getElementById('today-rx-filter').addEventListener('click', toggleTodayRxFilter);
+            document.getElementById('refresh-btn').addEventListener('click', refreshData);
+            document.getElementById('color-btn').addEventListener('click', openColorModal);
+
+            // Modal controls
+            document.getElementById('acte-close').addEventListener('click', closeActeModal);
+            document.getElementById('color-close').addEventListener('click', closeColorModal);
+            document.getElementById('detail-close').addEventListener('click', closeDetailModal);
+
+            document.getElementById('select-all-actes').addEventListener('click', selectAllActes);
+            document.getElementById('deselect-all-actes').addEventListener('click', deselectAllActes);
+            document.getElementById('validate-actes').addEventListener('click', validateActes);
+            document.getElementById('save-colors').addEventListener('click', saveColors);
+
+            // Close modals when clicking outside
+            window.addEventListener('click', function(event) {
+                if (event.target.classList.contains('modal')) {
+                    event.target.style.display = 'none';
+                }
+            });
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-message').style.display = 'block';
+            hideLoading();
+        }
+
+        function updateFilterControls(proth_values, acte_values, color_map, columns_from_data) {
+            const prothSelect = document.getElementById('proth-filter');
+            prothSelect.innerHTML = '';
+            proth_values.forEach(proth => {
+                const opt = document.createElement('option');
+                opt.value = proth;
+                opt.textContent = proth;
+                prothSelect.appendChild(opt);
+            });
+
+            prothValues = proth_values;
+            acteValues = acte_values;
+            colorMap = color_map;
+            columns = columns_from_data;
+
+            if (selectedActes.size === 0) {
+                document.getElementById('acte-button').textContent = 'Choisir actes';
+            } else {
+                document.getElementById('acte-button').textContent = selectedActes.size + ' acte(s)';
+            }
+        }
+
+        function loadTable() {
+            showLoading();
+
+            fetch('/filter?ts=' + Date.now(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+                },
+                body: JSON.stringify({
+                    proth_filter: document.getElementById('proth-filter').value,
+                    selected_actes: Array.from(selectedActes),
+                    today_tx_filter: document.getElementById('today-tx-filter').classList.contains('active'),
+                    today_rx_filter: document.getElementById('today-rx-filter').classList.contains('active'),
+                    sort_column: currentSortColumn,
+                    sort_reverse: currentSortReverse
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+
+                if (!data.success) {
+                    showError(data.error || 'Erreur lors de la récupération');
+                    return;
+                }
+
+                updateFilterControls(data.proth_values, data.acte_values, data.color_map, data.columns);
+                updateTable(data.data, data.count);
+            })
+            .catch(error => {
+                showError('Erreur de chargement: ' + error.message);
+            });
+        }
+
+        function updateTable(data, count) {
+            const tableHead = document.getElementById('table-head');
+            const tableBody = document.getElementById('table-body');
+            const counter = document.getElementById('counter');
+
+            // Clear existing content
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="' + columns.length + '" style="text-align: center; padding: 40px;">Aucune donnée trouvée</td></tr>';
+                counter.textContent = '0 élément(s)';
+                return;
+            }
+
+            // Create headers
+            const headerRow = document.createElement('tr');
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.textContent = col;
+                th.addEventListener('click', () => sortColumn(col));
+                if (currentSortColumn === col) {
+                    th.classList.add(currentSortReverse ? 'sort-desc' : 'sort-asc');
+                }
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+
+            // Create data rows
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                const acte = row['Acte prothésiste'];
+
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    let value = row[col] || '';
+
+                    if (col === 'Commentaires' && value) {
+                        value = value.replace(/\\n/g, '\n');
+                    } else if (col === 'Date du rdv' && value) {
+                        const dt = new Date(value);
+                        if (!isNaN(dt)) {
+                            value = dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+                        }
+                    } else if (col === 'PE' && value) {
+                        const dt = new Date(value);
+                        if (!isNaN(dt)) {
+                            value = dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+                        }
+                    } else if (col === 'url' && value) {
+                        const link = document.createElement('a');
+                        link.textContent = '▶▶ Ouvrir dans OrthoAdvance';
+                        link.href = value.replace('▶▶ Ouvrir dans OrthoAdvance ', '');
+                        link.target = '_blank';
+                        link.className = 'url-link';
+                        td.appendChild(link);
+                        tr.appendChild(td);
+                        return;
+                    }
+
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                // Apply color
+                if (colorMap[acte]) {
+                    tr.style.backgroundColor = colorMap[acte];
+                }
+
+                // Add double-click handler
+                tr.addEventListener('dblclick', () => showDetail(row));
+
+                tableBody.appendChild(tr);
+            });
+
+            counter.textContent = count + ' élément(s)';
+        }
+
+        function applyFilters() {
+            loadTable();
+        }
+
+        function sortColumn(col) {
+            if (currentSortColumn === col) {
+                currentSortReverse = !currentSortReverse;
+            } else {
+                currentSortColumn = col;
+                currentSortReverse = false;
+            }
+            loadTable();
+        }
+
+        function toggleTodayTxFilter() {
+            const btn = document.getElementById('today-tx-filter');
+            btn.classList.toggle('active');
+            applyFilters();
+        }
+
+        function toggleTodayRxFilter() {
+            const btn = document.getElementById('today-rx-filter');
+            btn.classList.toggle('active');
+            applyFilters();
+        }
+
+        function refreshData() {
+            showLoading();
+            fetch('/refresh?ts=' + Date.now(), {cache: 'no-store'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadTable();
+                } else {
+                    showError(data.error);
+                }
+            })
+            .catch(error => {
+                showError('Erreur de rafraîchissement: ' + error.message);
+            });
+        }
+
+        function openActeModal() {
+            const modal = document.getElementById('acte-modal');
+            const acteList = document.getElementById('acte-list');
+
+            acteList.innerHTML = '';
+            acteValues.forEach(acte => {
+                const div = document.createElement('div');
+                div.className = 'acte-checkbox';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'acte-' + acte;
+                checkbox.checked = selectedActes.has(acte);
+
+                const label = document.createElement('label');
+                label.htmlFor = 'acte-' + acte;
+                label.textContent = acte;
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                acteList.appendChild(div);
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function closeActeModal() {
+            document.getElementById('acte-modal').style.display = 'none';
+        }
+
+        function selectAllActes() {
+            document.querySelectorAll('#acte-list input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
+
+        function deselectAllActes() {
+            document.querySelectorAll('#acte-list input[type="checkbox"]').forEach(cb => cb.checked = false);
+        }
+
+        function validateActes() {
+            selectedActes.clear();
+            document.querySelectorAll('#acte-list input[type="checkbox"]:checked').forEach(cb => {
+                selectedActes.add(cb.id.replace('acte-', ''));
+            });
+
+            const btn = document.getElementById('acte-button');
+            if (selectedActes.size > 0) {
+                btn.textContent = selectedActes.size + ' acte(s)';
+            } else {
+                btn.textContent = 'Choisir actes';
+            }
+
+            closeActeModal();
+            applyFilters();
+        }
+
+        function openColorModal() {
+            const modal = document.getElementById('color-modal');
+            const colorList = document.getElementById('color-list');
+
+            colorList.innerHTML = '';
+            acteValues.forEach(acte => {
+                const div = document.createElement('div');
+                div.className = 'color-item';
+
+                const square = document.createElement('div');
+                square.className = 'color-square';
+                square.style.backgroundColor = colorMap[acte] || '#FFFFFF';
+                square.addEventListener('click', () => chooseColor(acte, square));
+
+                const label = document.createElement('span');
+                label.textContent = acte;
+
+                div.appendChild(square);
+                div.appendChild(label);
+                colorList.appendChild(div);
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function closeColorModal() {
+            document.getElementById('color-modal').style.display = 'none';
+        }
+
+        function chooseColor(acte, square) {
+            const input = document.createElement('input');
+            input.type = 'color';
+            input.value = square.style.backgroundColor;
+            input.addEventListener('change', function() {
+                square.style.backgroundColor = this.value;
+                colorMap[acte] = this.value;
+            });
+            input.click();
+        }
+
+        function saveColors() {
+            fetch('/save_colors', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({colors: colorMap})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeColorModal();
+                    loadTable(); // Refresh to apply new colors
+                } else {
+                    alert('Erreur lors de la sauvegarde: ' + data.error);
+                }
+            });
+        }
+
+        function showDetail(row) {
+            const modal = document.getElementById('detail-modal');
+            const content = document.getElementById('detail-content');
+
+            content.innerHTML = '';
+            columns.forEach(col => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '10px';
+                div.innerHTML = `<strong>${col}:</strong> ${row[col] || ''}`;
+                content.appendChild(div);
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

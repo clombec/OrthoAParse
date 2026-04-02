@@ -294,7 +294,7 @@ class OrthoADataParse():
             out_struct.append({
                 "id": user.get(patientId),  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
-                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user.get(patientId)}/profile/"  # Construct the URL for the user profile
+                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user.get(patientId)}/clinique/compact/"  # Construct the URL for the user clinique view
             })
         return out_struct
 
