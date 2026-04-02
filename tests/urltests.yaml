@@ -41,7 +41,7 @@ alldays2026:
     - "Cabinet ouvert ?"
 
 prothesiste:
-  url: "ang/#!/dashboard/prothesiste"
+  url: "medical/prothesiste/planning"
   type: csv
   keys:
   - "Prothésiste"
