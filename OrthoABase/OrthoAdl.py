@@ -119,6 +119,9 @@ class OrthoAdl():
             password_field = self.driver.find_element(By.ID, "password")
             password_field.send_keys(self.OrthoAPwd)
 
+            #Tab to trigger connexion button to become availalbe
+            password_field.send_keys(webdriver.Keys.TAB)
+
             logging.info("Credentials entered.")
             # 5. Click on the "Me connecter" button
             login_button = WebDriverWait(self.driver, 10).until(
