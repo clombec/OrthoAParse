@@ -23,6 +23,9 @@ import shutil
 import yaml
 from datetime import datetime
 from orthoaget import PROJECT_ROOT
+import keyring
+
+KEYRING_SERVICE = "OrthoAGet"  # Service name for keyring credentials
 
 class OrthoAConnectionError(Exception):
     """Raised when OrthoAdvance is unreachable or login fails."""
@@ -38,13 +41,25 @@ class OrthoAdl():
     def __init__(self, download_dir, no_dl=False):
         self.no_dl = no_dl
         self.download_dir = download_dir
-        # Load YAML configuration file
-        with open(f"{PROJECT_ROOT}/OrthoABase/config.yaml", "r") as file:
+
+        config_path = f"{PROJECT_ROOT}/OrthoABase/config.yaml"
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(
+                f"config.yaml introuvable : {config_path}\n"
+                "Configurez l'application via la page web."
+            )
+
+        with open(config_path, "r") as file:
             config = yaml.safe_load(file)
-        # Get the connection values
         self.OrthoAUrlBase = f"https://{config['connexion']['url']}.orthoadvance.com"
-        self.OrthoAlogin = config['connexion']['login']
-        self.OrthoAPwd = config['connexion']['pwd']
+
+        self.OrthoAlogin = keyring.get_password(KEYRING_SERVICE, "login")
+        self.OrthoAPwd   = keyring.get_password(KEYRING_SERVICE, "password")
+        if not self.OrthoAlogin or not self.OrthoAPwd:
+            raise RuntimeError(
+                "Credentials absents du keyring.\n"
+                "Configurez l'application via la page web."
+            )
 
         if not self.no_dl:
             self.connect(download_dir)
