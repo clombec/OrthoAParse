@@ -22,7 +22,7 @@ import time
 import shutil
 import yaml
 from datetime import datetime
-
+from orthoaget import PROJECT_ROOT
 
 class OrthoAConnectionError(Exception):
     """Raised when OrthoAdvance is unreachable or login fails."""
@@ -39,7 +39,7 @@ class OrthoAdl():
         self.no_dl = no_dl
         self.download_dir = download_dir
         # Load YAML configuration file
-        with open("OrthoABase/config.yaml", "r") as file:
+        with open(f"{PROJECT_ROOT}/OrthoABase/config.yaml", "r") as file:
             config = yaml.safe_load(file)
         # Get the connection values
         self.OrthoAUrlBase = f"https://{config['connexion']['url']}.orthoadvance.com"

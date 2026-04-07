@@ -1,6 +1,6 @@
 import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
-import OrthoABase.OrthoALogger as OrthoALogger
+from orthoaget.logger import setup_logger
 import requests
 import logging
 import yaml
@@ -9,7 +9,9 @@ from tkinter import messagebox
 from datetime import datetime
 import time
 
-CONFIG_PATH = "OrthoABase/config.yaml"
+from orthoaget import PROJECT_ROOT
+
+CONFIG_PATH = f"{PROJECT_ROOT}/OrthoABase/config.yaml"
 
 def load_webhook():
     """
@@ -144,7 +146,7 @@ def run():
 
 def main(oneshot=True):
 
-    OrthoALogger.setup_logger()
+    setup_logger()
 
     if oneshot:
         return run()

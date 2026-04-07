@@ -10,6 +10,7 @@ import yaml
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+from orthoaget import PROJECT_ROOT
 
 DEBUG_NO_DL_IN = False
 
@@ -208,10 +209,18 @@ class OrthoADataParse():
 
         if structure_name == "prothesiste":
             for item in data:
-                dt = datetime.fromisoformat(
-                    item.pop("Date du rdv"),
-                )
+                dt = datetime.fromisoformat(item.pop("Date du rdv"))
                 item["Date du rdv"] = dt.isoformat()
+                pe_date_str = item.pop("PE", "")
+                if pe_date_str == "":
+                    item["PE"] = None
+                else:
+                    dt = datetime.fromisoformat(pe_date_str)
+                    item["PE"] = dt.isoformat()
+                dt = datetime.strptime(item.pop("Date d'envoi au labo"), "%d/%m/%Y").date()
+                item["Date d'envoi au labo"] = dt.isoformat()
+                dt = datetime.strptime(item.pop("Date de réception"), "%d/%m/%Y").date()
+                item["Date de réception"] = dt.isoformat()
         return data
 
     def cleanUpCalendarEvents(self, datain, structure_name):
@@ -344,7 +353,7 @@ Get all data from OrthoAdvance, parse it and save it in a structured format (e.g
 Raises OrthoAdl.OrthoAConnectionError if login fails.
 Raises OrthoAdl.OrthoADownloadError if a download fails.
 """
-def extract(urlFile="OrthoABase/url.yaml"):    # Configure download folder path and clear as needed
+def extract(urlFile=f"{PROJECT_ROOT}/OrthoABase/url.yaml"):    # Configure download folder path and clear as needed
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
         DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage

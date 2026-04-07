@@ -12,7 +12,8 @@ import logging
 from datetime import datetime, date
 import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
-import OrthoABase.OrthoALogger as OrthoALogger
+from orthoaget.logger import setup_logger
+from orthoaget import PROJECT_ROOT
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -40,7 +41,7 @@ class ProthDataManager:
     def load_data(self):
         """Load data from OrthoAData and configuration."""
         try:
-            with open("OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
+            with open(f"{PROJECT_ROOT}/OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
                 yamlconfig = yaml.safe_load(f)
                 self.color_map = yamlconfig.get("colors", {})
                 self.column_map = yamlconfig.get("columns", {})
@@ -197,7 +198,7 @@ def save_colors():
     }
 
     try:
-        with open("OrthoAProthData/Configuration.yaml", "w", encoding="utf-8") as f:
+        with open(f"{PROJECT_ROOT}/OrthoAProthData/Configuration.yaml", "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True)
         return jsonify({'success': True})
     except Exception as e:
@@ -213,7 +214,7 @@ def refresh():
         return jsonify({'success': False, 'error': 'Erreur de chargement'})
 
 def main():
-    OrthoALogger.setup_logger()
+    setup_logger()
     app.run(host="0.0.0.0", port=5002, debug=False)
 
 if __name__ == "__main__":

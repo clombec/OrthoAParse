@@ -6,10 +6,12 @@ import logging
 from datetime import datetime, date
 import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
-import OrthoABase.OrthoALogger as OrthoALogger
+from orthoaget.logger import setup_logger
 from tkinter import colorchooser
 import platform
 import webbrowser
+
+from orthoaget import PROJECT_ROOT
 
 
 # =========================
@@ -109,7 +111,7 @@ class App(ctk.CTk):
 
     def load_data(self):
 
-        with open("OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
+        with open(f"{PROJECT_ROOT}/OrthoAProthData/Configuration.yaml", "r", encoding="utf-8") as f:
             yamlconfig = yaml.safe_load(f)
             self.color_map = yamlconfig.get("colors", {})
             self.column_map = yamlconfig.get("columns", {})
@@ -348,7 +350,7 @@ class App(ctk.CTk):
         self.color_map = self.temp_colors.copy()
         #self.column_map = self.temp_columns.copy()
 
-        with open("OrthoAProthData/configuration.yaml", "w", encoding="utf-8") as f:
+        with open(f"{PROJECT_ROOT}/OrthoAProthData/configuration.yaml", "w", encoding="utf-8") as f:
             config = {
                 "colors": self.color_map,
                 "columns": self.column_map
@@ -766,7 +768,7 @@ class App(ctk.CTk):
         )
 
 def main():
-    OrthoALogger.setup_logger()
+    setup_logger()
 
     # Set AppUserModelID so Windows taskbar shows the correct icon
     try:
