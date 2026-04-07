@@ -22,7 +22,7 @@ def get_records():
         # Map each patient in the act list to a URL from patient lookup table by case-insensitive name match
         for id in patient_ids:
             if id["name"].lower() == patient_name.lower():
-                line["url"] = f"{id['url']}"
+                line["url"] = f"{id['url']}" 
                 break
     return full_data
 
