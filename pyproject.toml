@@ -10,3 +10,6 @@ dependencies = ["keyring", "selenium", "webdriver-manager"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["orthoaget*", "OrthoABase*"]
+
+[tool.setuptools.package-data]
+"OrthoABase" = ["*.yaml"]
