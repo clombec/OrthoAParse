@@ -118,7 +118,7 @@ class App(ctk.CTk):
 
         try:
             data = OrthoAData.extract(
-                "OrthoAProthData/prothData.yaml"
+                ["prothesiste", "users"]
             )
         except OrthoAdl.OrthoAConnectionError as e:
             logging.error(f"Erreur de connexion : {e}")

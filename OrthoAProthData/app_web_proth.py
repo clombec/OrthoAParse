@@ -50,7 +50,7 @@ class ProthDataManager:
             self.column_map = {}
 
         try:
-            data = OrthoAData.extract("OrthoAProthData/prothData.yaml")
+            data = OrthoAData.extract(["prothesiste", "users"])
             self.full_data = data['prothesiste']
             self.patientIds = data['users']
 

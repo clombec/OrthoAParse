@@ -32,5 +32,5 @@ def test_download_csv(tmp_path):
 
 def test_extract_data():
     """extract() should extract data without error."""
-    data = OrthoABase.OrthoAData.extract("tests/urltests.yaml")
+    data = OrthoABase.OrthoAData.extract() # Empty request means all urls from urls.yaml
     assert isinstance(data, dict)  # the extracted data should be a dictionary

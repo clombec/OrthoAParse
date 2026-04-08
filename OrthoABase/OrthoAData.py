@@ -348,30 +348,45 @@ class OrthoADataParse():
         return self.cleanUpSwitch.get(structure_name, lambda x, y: x)(datain, structure_name)
 
 
+URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
+
 """
-Get all data from OrthoAdvance, parse it and save it in a structured format (e.g. CSV, JSON, database)
+Download and parse a subset of OrthoAdvance data.
+
+Parameters
+----------
+entries   : list of entry names to fetch (e.g. ["prothesiste", "users"]).
+            Must match top-level entries in urls.yaml.
+urls_file : path to the global urls.yaml (defaults to OrthoABase/urls.yaml).
+
 Raises OrthoAdl.OrthoAConnectionError if login fails.
 Raises OrthoAdl.OrthoADownloadError if a download fails.
+Raises KeyError if a requested entry is not found in urls.yaml.
 """
-def extract(urlFile=f"{PROJECT_ROOT}/OrthoABase/url.yaml"):    # Configure download folder path and clear as needed
+def extract(entries: list = None, urls_file: str = URLS_FILE):
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
-        DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory before usage
+        DownloadDir.clearDownloadDir(download_dir)
+
+    with open(urls_file, "r", encoding="utf-8") as f:
+        all_urls = yaml.safe_load(f)
+
+    if entries is None:
+        entries = list(all_urls.keys())
+
+    missing = [e for e in entries if e not in all_urls]
+    if missing:
+        raise KeyError(f"Entries not found in {urls_file}: {missing}")
 
     # OrthoADataParse.__init__ calls OrthoAdl.connect() — raises OrthoAConnectionError if it fails
     orthoAdp = OrthoADataParse(download_dir)
 
-    # Load configuration from url.yaml
-    with open(urlFile, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-    # Parse each structure and store results
     parsed_data = {}
-    for structure_name, structure_config in config.items():
+    for structure_name in entries:
+        structure_config = all_urls[structure_name]
         url = structure_config.get("url")
         data_type = structure_config.get("type")
-        keys = structure_config.get("keys", None)
-        orthoAdp.dataKeys[structure_name] = keys
+        orthoAdp.dataKeys[structure_name] = structure_config.get("keys", None)
 
         data = None
         if data_type == "csv":
@@ -384,7 +399,7 @@ def extract(urlFile=f"{PROJECT_ROOT}/OrthoABase/url.yaml"):    # Configure downl
             data = orthoAdp.parseMulti(url, structure_name)
 
         if not DEBUG_NO_DL_IN:
-            DownloadDir.clearDownloadDir(download_dir)  # Clear the download directory after usage
+            DownloadDir.clearDownloadDir(download_dir)
 
         if data is not None:
             parsed_data[structure_name] = data
@@ -394,7 +409,7 @@ def extract(urlFile=f"{PROJECT_ROOT}/OrthoABase/url.yaml"):    # Configure downl
     return parsed_data
 
 def main():
-    OrthoAdata = extract()
+    OrthoAdata = extract(["rdvs_history", "users"])
     with open("data.json", "w") as f:
         json.dump(OrthoAdata, f, indent=2)
 

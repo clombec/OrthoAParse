@@ -1,5 +1,0 @@
-nb_patients_period:
-  url: "statistiques/stat-periodes-traitement"
-  type: csv
-  keys:
-    - "Mars 2026"

@@ -99,7 +99,7 @@ def ask_webhook_gui():
 def run():
     try:
         data = OrthoAData.extract(
-            "OrthoARecettes/recettes.yaml"
+            ["recette"]
         )
     except OrthoAdl.OrthoAConnectionError as e:
         logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
