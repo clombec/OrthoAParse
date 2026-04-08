@@ -1,5 +1,5 @@
-import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
+from orthoaget.session import OrthoASession
 from orthoaget.logger import setup_logger
 import requests
 import logging
@@ -98,9 +98,8 @@ def ask_webhook_gui():
 
 def run():
     try:
-        data = OrthoAData.extract(
-            ["recette"]
-        )
+        with OrthoASession() as session:
+            data = session.extract(["recette"])
     except OrthoAdl.OrthoAConnectionError as e:
         logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
         return 0

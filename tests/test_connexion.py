@@ -8,7 +8,7 @@ using real credentials from OrthoABase/config.yaml file.
 import os
 import pytest
 from OrthoABase.OrthoAdl import OrthoAdl, OrthoAConnectionError
-import OrthoABase
+from orthoaget.session import OrthoASession
 
 
 def test_connexion_orthoadvance(tmp_path):
@@ -31,6 +31,7 @@ def test_download_csv(tmp_path):
     adl.end()
 
 def test_extract_data():
-    """extract() should extract data without error."""
-    data = OrthoABase.OrthoAData.extract() # Empty request means all urls from urls.yaml
-    assert isinstance(data, dict)  # the extracted data should be a dictionary
+    """OrthoASession.extract() should extract data without error."""
+    with OrthoASession() as session:
+        data = session.extract() # Empty request means all urls from urls.yaml
+    assert isinstance(data, dict)

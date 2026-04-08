@@ -4,13 +4,10 @@ import logging
 import os
 import csv
 import pandas as pd
-from . import DownloadDir
 import json
-import yaml
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
-from orthoaget import PROJECT_ROOT
 
 DEBUG_NO_DL_IN = False
 
@@ -303,7 +300,6 @@ class OrthoADataParse():
             out_struct.append({
                 "id": user.get(patientId),  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
-                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/<ID>/clinique/compact/"  # Static URL for the user clinique view. Final URL is built when displayed with Django users DB in OrthoAPnD
             })
         return out_struct
 
@@ -347,80 +343,7 @@ class OrthoADataParse():
     def cleanUp(self, datain, structure_name):
         return self.cleanUpSwitch.get(structure_name, lambda x, y: x)(datain, structure_name)
 
-
-URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
-
-"""
-Download and parse a subset of OrthoAdvance data.
-
-Parameters
-----------
-entries   : list of entry names to fetch (e.g. ["prothesiste", "users"]).
-            Must match top-level entries in urls.yaml.
-urls_file : path to the global urls.yaml (defaults to OrthoABase/urls.yaml).
-
-Raises OrthoAdl.OrthoAConnectionError if login fails.
-Raises OrthoAdl.OrthoADownloadError if a download fails.
-Raises KeyError if a requested entry is not found in urls.yaml.
-"""
-def extract(entries: list, urls_file: str = URLS_FILE):
-    download_dir = DownloadDir.setupDownloadDir("downloads")
-    if not DEBUG_NO_DL_IN:
-        DownloadDir.clearDownloadDir(download_dir)
-
-    with open(urls_file, "r", encoding="utf-8") as f:
-        all_urls = yaml.safe_load(f)
-
-    if entries is None:
-        entries = list(all_urls.keys())
-
-    missing = [e for e in entries if e not in all_urls]
-    if missing:
-        raise KeyError(f"Entries not found in {urls_file}: {missing}")
-
-    # OrthoADataParse.__init__ calls OrthoAdl.connect() — raises OrthoAConnectionError if it fails
-    orthoAdp = OrthoADataParse(download_dir)
-
-    parsed_data = {}
-    for structure_name in entries:
-        structure_config = all_urls[structure_name]
-        url = structure_config.get("url")
-        data_type = structure_config.get("type")
-        orthoAdp.dataKeys[structure_name] = structure_config.get("keys", None)
-
-        data = None
-        if data_type == "csv":
-            data = orthoAdp.parseCsv(url, structure_name)
-        elif data_type == "json":
-            data = orthoAdp.parseJson(url, structure_name)
-        elif data_type == "html":
-            data = orthoAdp.parseHtml(url, structure_name)
-        elif data_type == "multi":
-            data = orthoAdp.parseMulti(url, structure_name)
-
-        if not DEBUG_NO_DL_IN:
-            DownloadDir.clearDownloadDir(download_dir)
-
-        if data is not None:
-            parsed_data[structure_name] = data
-
-    orthoAdp.end()
-
-    return parsed_data
-
 def main():
-    OrthoAdata = extract(["rdvs_history", "users"])
-    with open("data.json", "w") as f:
-        json.dump(OrthoAdata, f, indent=2)
-
-    for rdv in OrthoAdata["rdvs_history"]:
-        patient_name = rdv.get("Patient")
-        user = next((u for u in OrthoAdata["users"] if u["name"].lower() == patient_name.lower()), None)
-        if user:
-            patient_id = user["id"]
-            logging.info(f"Rendez-vous for patient {patient_name} (ID: {patient_id})")
-        else:
-            logging.warning(f"Rendez-vous for patient {patient_name} (ID: not found)")
-
+        print("nothing to see here, just the OrthoAData module with its OrthoADataParse class")
 if __name__ == "__main__":
     main()

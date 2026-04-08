@@ -10,8 +10,8 @@ from flask import Flask, render_template, request, jsonify, url_for
 import yaml
 import logging
 from datetime import datetime, date
-import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
+from orthoaget.session import OrthoASession
 from orthoaget.logger import setup_logger
 from orthoaget import PROJECT_ROOT
 
@@ -50,17 +50,18 @@ class ProthDataManager:
             self.column_map = {}
 
         try:
-            data = OrthoAData.extract(["prothesiste", "users"])
-            self.full_data = data['prothesiste']
-            self.patientIds = data['users']
+            with OrthoASession() as session:
+                data = session.extract(["prothesiste", "users"])
+                self.full_data = data['prothesiste']
+                self.patientIds = data['users']
 
-            # Map patients to URLs
-            for line in self.full_data:
-                patient_name = line.get("Patient", "")
-                for id_entry in self.patientIds:
-                    if id_entry["name"].lower() == patient_name.lower():
-                        line["url"] = f"▶▶ Ouvrir dans OrthoAdvance {id_entry['url']}"
-                        break
+                # Map patients to URLs
+                for line in self.full_data:
+                    patient_name = line.get("Patient", "")
+                    for id_entry in self.patientIds:
+                        if id_entry["name"].lower() == patient_name.lower():
+                            line["url"] = f"▶▶ Ouvrir dans OrthoAdvance {session.user_url(id_entry['id'])}"
+                            break
 
             logging.info(f"Data loaded. {len(self.full_data)} records found.")
             return True

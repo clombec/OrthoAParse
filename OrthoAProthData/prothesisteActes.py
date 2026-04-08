@@ -4,8 +4,8 @@ from tkinter import ttk
 import yaml
 import logging
 from datetime import datetime, date
-import OrthoABase.OrthoAData as OrthoAData
 import OrthoABase.OrthoAdl as OrthoAdl
+from orthoaget.session import OrthoASession
 from orthoaget.logger import setup_logger
 from tkinter import colorchooser
 import platform
@@ -117,9 +117,8 @@ class App(ctk.CTk):
             self.column_map = yamlconfig.get("columns", {})
 
         try:
-            data = OrthoAData.extract(
-                ["prothesiste", "users"]
-            )
+            with OrthoASession() as session:
+                data = session.extract(["prothesiste", "users"])
         except OrthoAdl.OrthoAConnectionError as e:
             logging.error(f"Erreur de connexion : {e}")
             self.show_error(str(e))
