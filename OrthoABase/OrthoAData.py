@@ -303,7 +303,7 @@ class OrthoADataParse():
             out_struct.append({
                 "id": user.get(patientId),  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
-                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user.get(patientId)}/clinique/compact/"  # Construct the URL for the user clinique view
+                "url": f"{self.orthoAdl.OrthoAUrlBase}/ang/#!/users/<ID>/clinique/compact/"  # Static URL for the user clinique view. Final URL is built when displayed with Django users DB in OrthoAPnD
             })
         return out_struct
 
@@ -363,7 +363,7 @@ Raises OrthoAdl.OrthoAConnectionError if login fails.
 Raises OrthoAdl.OrthoADownloadError if a download fails.
 Raises KeyError if a requested entry is not found in urls.yaml.
 """
-def extract(entries: list = None, urls_file: str = URLS_FILE):
+def extract(entries: list, urls_file: str = URLS_FILE):
     download_dir = DownloadDir.setupDownloadDir("downloads")
     if not DEBUG_NO_DL_IN:
         DownloadDir.clearDownloadDir(download_dir)
