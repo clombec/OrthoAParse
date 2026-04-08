@@ -80,6 +80,14 @@ class OrthoASession:
                 parsed_data[structure_name] = data
 
         return parsed_data
+    
+    def get_proth_records(self):
+        data = self.extract(["prothesiste"])
+        return data['prothesiste']
+
+    def get_users_records(self):
+        data = self.extract(["users"])
+        return data['users']
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""
