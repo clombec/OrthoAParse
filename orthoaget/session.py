@@ -18,6 +18,8 @@ Or as a context manager:
         data = session.extract(["prothesiste", "users"])
 """
 
+from datetime import datetime
+
 import yaml
 from OrthoABase import DownloadDir
 from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN
@@ -88,6 +90,16 @@ class OrthoASession:
     def get_users_records(self):
         data = self.extract(["users"])
         return data['users']
+
+    def get_income_records(self):
+        data = self.extract(["recettes"])
+        total = 0
+        for line in data["recette"]:
+            amount = line["Montant"]
+            canceled = line["A"]
+            if not canceled:
+                total = total + float(amount.replace(",", "."))
+        return {"amount": total, "date": datetime.now().strftime("%Y-%m-%d")}
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""
