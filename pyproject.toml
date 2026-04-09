@@ -5,7 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orthoaget"
 version = "0.1.0"
-dependencies = ["keyring", "selenium", "webdriver-manager"]
+dependencies = [
+    "keyring",
+    "secretstorage; sys_platform == 'linux'",
+    "selenium",
+    "webdriver-manager",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
