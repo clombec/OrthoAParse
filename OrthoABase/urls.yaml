@@ -45,12 +45,21 @@ prothesiste:
     - "Durée"
     - "Commentaires"
 
-recette:
-  url: "reglements/history"
+recette_jour:
+  url: "reglements/history/"
   type: csv
   keys:
     - "Montant"
-    - "A"
+    - "Réglé le"
+    - "Encaissé"
+
+recettes_annuelles:
+  url: "reglements/history/;yearly_view?doperation_year={year}&dcashed_year=&receveur=&cabinet=&batch_size=60&payment_way=&cashed=1&cancelled_any=0&action=search"
+  type: csv
+  keys:
+    - "Montant"
+    - "Réglé le"
+    - "Encaissé"
 
 stat_periodes:
   url: "statistiques/stat-periodes-traitement"

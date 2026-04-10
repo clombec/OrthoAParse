@@ -99,7 +99,7 @@ def ask_webhook_gui():
 def run():
     try:
         with OrthoASession() as session:
-            data = session.extract(["recette"])
+            data = session.extract(["recette_jour"])
     except OrthoAdl.OrthoAConnectionError as e:
         logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
         return 0
@@ -110,13 +110,13 @@ def run():
         logging.error(f"Erreur inattendue lors de la récupération des données : {e}")
         return 0
 
+    today = datetime.now().strftime("%Y-%m-%d")
     total = 0
-    for line in data["recette"]:
-        amount = line["Montant"]
-        canceled = line["A"]
-        if not canceled:
-            total = total + float(amount.replace(",", "."))
-            logging.info(f"Recette: {amount}")
+    for line in data["recette_jour"]:
+        if line.get("date") == today:
+            total = line.get("amount", 0)
+            break;
+        logging.info(f"Recette {line.get('date')}: {line.get('amount')}")
     logging.info(f"Total: {total:.2f}")
 
     # Load webhook URL from config.yaml — ask user via GUI if not set

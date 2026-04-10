@@ -35,3 +35,15 @@ def test_extract_data():
     with OrthoASession() as session:
         data = session.extract() # Empty request means all urls from urls.yaml
     assert isinstance(data, dict)
+
+def test_income_records():
+    """Extracted data should contain expected keys."""
+    with OrthoASession() as session:
+        data = session.get_income_records(True)
+    for line in data:
+        print(f"Extracted income records: {line.get('date')}, amount: {line.get('amount')}")
+        assert "amount" in line
+        assert "date" in line
+        assert type(line) == dict
+    print(data)
+    assert type(data) == list

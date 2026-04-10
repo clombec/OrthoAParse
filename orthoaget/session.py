@@ -40,7 +40,7 @@ class OrthoASession:
         # Single connect — Chrome starts here
         self._parser = OrthoADataParse(self._download_dir)
 
-    def extract(self, entries: list | None = None) -> dict:
+    def extract(self, entries: list | None = None, params: dict | None = None) -> dict:
         """
         Download and parse the requested entries.
         Reuses the existing browser session — no reconnect.
@@ -49,6 +49,9 @@ class OrthoASession:
         ----------
         entries : list of entry names matching top-level keys in urls.yaml.
                   If None or omitted, all entries from urls.yaml are fetched.
+        params  : optional dict of placeholder substitutions applied to each URL
+                  before fetching. Placeholders in urls.yaml use {key} syntax,
+                  e.g. params={"month": "04"} replaces {month} in matching URLs.
 
         Raises KeyError if an entry is not found in urls.yaml.
         """
@@ -62,6 +65,8 @@ class OrthoASession:
         for structure_name in entries:
             structure_config = self._all_urls[structure_name]
             url = structure_config.get("url")
+            if params:
+                url = url.format_map(params)
             data_type = structure_config.get("type")
             self._parser.dataKeys[structure_name] = structure_config.get("keys", None)
 
@@ -91,15 +96,13 @@ class OrthoASession:
         data = self.extract(["users"])
         return data['users']
 
-    def get_income_records(self):
-        data = self.extract(["recette"])
-        total = 0
-        for line in data["recette"]:
-            amount = line["Montant"]
-            canceled = line["A"]
-            if not canceled:
-                total = total + float(amount.replace(",", "."))
-        return {"amount": total, "date": datetime.now().strftime("%Y-%m-%d")}
+    def get_income_records(self, all = False):
+        if all:
+            data = self.extract(["recettes_annuelles"], params={"year": str(datetime.now().year)})
+            return data['recettes_annuelles']
+        else:
+            data = self.extract(["recette_jour"])
+            return data["recette_jour"]
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""

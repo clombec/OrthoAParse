@@ -28,7 +28,8 @@ class OrthoADataParse():
             "users": self.cleanUpUsers,
             "alldays2026": self.cleanUpJt2026,
             "prothesiste": self.cleanUpCsv,
-            "recette": self.cleanUpCsv,
+            "recette_jour": self.cleanUpCsv,
+            "recettes_annuelles": self.cleanUpCsv,
             "journees_type": self.cleanUpJourneesType,
             "stat_periodes": self.cleanUpCsv,
         }
@@ -218,6 +219,31 @@ class OrthoADataParse():
                 item["Date d'envoi au labo"] = dt.isoformat()
                 dt = datetime.strptime(item.pop("Date de réception"), "%d/%m/%Y").date()
                 item["Date de réception"] = dt.isoformat()
+
+        if structure_name == "recette_jour":
+            totals = {}
+            for item in data:
+                if str(item.get("Encaissé", "")).strip().lower() != "oui":
+                    continue
+                date = item.get("Réglé le", "")
+                try:
+                    amount = float(str(item.get("Montant", "0")).replace(",", "."))
+                except ValueError:
+                    amount = 0.0
+                totals[date] = totals.get(date, 0.0) + amount
+            data = [{"date": date, "amount": round(montant, 2)} for date, montant in sorted(totals.items())]
+
+        if structure_name == "recettes_annuelles":
+            totals = {}
+            for item in data:
+                date = item.get("Réglé le", "")
+                try:
+                    amount = float(str(item.get("Montant", "0")).replace(",", "."))
+                except ValueError:
+                    amount = 0.0
+                totals[date] = totals.get(date, 0.0) + amount
+            data = [{"date": date, "amount": round(montant, 2)} for date, montant in sorted(totals.items())]
+
         return data
 
     def cleanUpCalendarEvents(self, datain, structure_name):
