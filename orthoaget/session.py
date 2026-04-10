@@ -92,7 +92,7 @@ class OrthoASession:
         return data['users']
 
     def get_income_records(self):
-        data = self.extract(["recettes"])
+        data = self.extract(["recette"])
         total = 0
         for line in data["recette"]:
             amount = line["Montant"]
