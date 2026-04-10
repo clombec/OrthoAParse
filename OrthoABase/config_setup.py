@@ -4,8 +4,8 @@ setup_console.py
 Interactive console module to configure OrthoAGet:
   - OrthoAdvance URL prefix  → saved in config.yaml
   - Discord webhook URL      → saved in config.yaml
-  - Login (email)            → saved in Windows keyring
-  - Password                 → saved in Windows keyring
+  - Login (email)            → saved in system keyring (Windows Credential Manager / macOS Keychain / SecretService)
+  - Password                 → saved in system keyring (Windows Credential Manager / macOS Keychain / SecretService)
 """
 
 import os
@@ -69,7 +69,7 @@ def setup():
         keyring.set_password(KEYRING_SERVICE, "login", login)
     if pwd:
         keyring.set_password(KEYRING_SERVICE, "password", pwd)
-    print("Credentials saved to Windows keyring.")
+    print("Credentials saved to system keyring.")
 
     print("\n=== Configuration complete ===\n")
 
