@@ -7,3 +7,5 @@ customtkinter
 pillow
 pytest
 flask
+keyring
+
