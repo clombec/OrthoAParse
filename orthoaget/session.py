@@ -97,8 +97,10 @@ class OrthoASession:
         return data['users']
 
     def get_income_records(self, all = False):
-        if all:
+        if all: # Get both current and previous year records
             data = self.extract(["recettes_annuelles"], params={"year": str(datetime.now().year)})
+            data_last = self.extract(["recettes_annuelles"], params={"year": str(datetime.now().year-1)})
+            data['recettes_annuelles'].extend(data_last['recettes_annuelles'])
             return data['recettes_annuelles']
         else:
             data = self.extract(["recette_jour"])
