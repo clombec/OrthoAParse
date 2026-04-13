@@ -96,13 +96,13 @@ class OrthoASession:
         data = self.extract(["users"])
         return data['users']
 
-    def get_jt_records(self) -> dict:
+    def get_calendar_records(self) -> dict:
         """
         Fetch the full planning configuration from OrthoAdvance.
-        Returns a dict with keys: 'alldays2026', 'jt', 'metatypes'.
-        Requires a 'journees_types' entry in urls.yaml pointing to the planning API.
+        Returns a dict with keys: 'alldays2026', 'jt', 'metatypes', 'rdvs_history'.
+        Requires entries in urls.yaml for: jt, metatypes, alldays2026, rdvs_history.
         """
-        data = self.extract(["jt", "metatypes", "alldays2026"])
+        data = self.extract(["jt", "metatypes", "alldays2026", "rdvs_history"])
         return data
 
     def get_income_records(self, years = 0):
