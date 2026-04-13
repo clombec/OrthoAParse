@@ -96,6 +96,15 @@ class OrthoASession:
         data = self.extract(["users"])
         return data['users']
 
+    def get_jt_records(self) -> dict:
+        """
+        Fetch the full planning configuration from OrthoAdvance.
+        Returns a dict with keys: 'alldays2026', 'jt', 'metatypes'.
+        Requires a 'journees_types' entry in urls.yaml pointing to the planning API.
+        """
+        data = self.extract(["jt", "metatypes", "alldays2026"])
+        return data
+
     def get_income_records(self, years = 0):
         """
         Get <years> last years of income data. Default is 0, which means only today. 1 is this year, 2 is this year and last year...

@@ -10,6 +10,13 @@ rdvs_history:
 jt:
   url: "ang/#!/planning/preparation/jtypes/list/active"
   type: multi
+  keys:
+   - "day"
+   - "metatype"
+   - "startminutes"
+   - "praticien_id"
+   - "duration"
+   - "fauteuil"
 
 metatypes:
   url: "planning/jt/journees/5/;view?json=1"

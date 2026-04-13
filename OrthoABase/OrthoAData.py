@@ -130,7 +130,7 @@ class OrthoADataParse():
 
         # Fetch and parse each day type individually
         for jid, label in journee_ids:
-            json_url = f"/planning/jt/journees/{jid}/;view?json=1"
+            json_url = f"/planning/calendar/;events_view?jt=/planning/jt/journees/{jid}&mode=jt&cabinet=/config-application/cabinets/0"
             logging.info(f"[parseMulti] Parsing day type {jid} ({label})...")
             try:
                 rows = self.parseJson(json_url, structure_name)
@@ -139,49 +139,22 @@ class OrthoADataParse():
                 logging.warning(f"[parseMulti] Skipping day type {jid}: {e}")
                 continue
             if rows is not None:
-                outdata[jid] = {
-                    "label": label,
-                    "sequences": rows
-                }
+                outdata[label] = rows
 
         logging.info(f"[parseMulti] Done — {len(outdata)} day types parsed")
         return outdata
 
     def cleanUpJourneesType(self, datain, structure_name):
-        """
-        Parses a journée type from /planning/jt/journees/<n>/;view?json=1
-        Extracts sequences (metatype_id → {as1, dr, as2})
-        enriched with value/color from enumerates.metatypes.list
-        """
-        sequences = datain.get("sequences", {})
-        metatypes_list = datain.get("enumerates", {}).get("metatypes", {}).get("list", [])
+        keys = self.dataKeys.get(structure_name)
+        outdata = []
+        if keys is None:
+            logging.error(f"Error: dataKeys for {structure_name} is not defined")
+            return []
+        for item in datain.get("events", []):
+            line = {k: item.get(k) for k in keys}
+            outdata.append(line)
 
-        # Build a lookup dict of name/color by metatype_id
-        meta_info = {}
-        for meta in metatypes_list:
-            meta_id = int(meta["name"].split("/")[-1])
-            meta_info[meta_id] = {
-                "value": meta.get("value"),
-                "color": meta.get("color"),
-            }
-
-        # Build output list — one row per active metatype (at least one non-zero duration)
-        out = []
-        for key, roles in sequences.items():
-            meta_id = int(key.split("/")[-1])
-            # Skip metatypes with all-zero durations — not scheduled in this day type
-            if not any(roles.values()):
-                continue
-            row = {
-                "metatype_id": meta_id,
-                "as1": roles.get("as1", 0),
-                "dr": roles.get("dr", 0),
-                "as2": roles.get("as2", 0),
-            }
-            row.update(meta_info.get(meta_id, {"value": None, "color": None}))
-            out.append(row)
-
-        return out
+        return {'events':outdata}
 
 
     def cleanUpCsv(self, dfin, structure_name):
@@ -371,5 +344,7 @@ class OrthoADataParse():
 
 def main():
         print("nothing to see here, just the OrthoAData module with its OrthoADataParse class")
+
+        
 if __name__ == "__main__":
     main()

@@ -33,7 +33,7 @@ def test_download_csv(tmp_path):
 def test_extract_data():
     """OrthoASession.extract() should extract data without error."""
     with OrthoASession() as session:
-        data = session.extract() # Empty request means all urls from urls.yaml
+        data = session.extract(params={'year': "2026"}) # Empty request means all urls from urls.yaml
     assert isinstance(data, dict)
 
 def test_income_records_day():
