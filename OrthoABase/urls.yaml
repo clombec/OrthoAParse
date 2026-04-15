@@ -7,18 +7,30 @@ rdvs_history:
     - "Plage planning"
     - "Praticien"
 
-jt:
-  url: "ang/#!/planning/preparation/jtypes/list/active"
-  type: multi
+jt:  # All journées types
+  url: "planning/;jtypes_json_view"
+  type: json
   keys:
-   - "day"
-   - "metatype"
-   - "startminutes"
-   - "praticien_id"
-   - "duration"
-   - "fauteuil"
+    - "jtypes"
+  subkeys:
+    - "title"
+    - "abspath"
+    - "name"
+    - "color"
 
-metatypes:
+jt1:  # Single journée type
+  url: "/planning/calendar/;events_view?jt=/planning/jt/journees/{jid}&mode=jt&cabinet=/config-application/cabinets/0"
+  type: json
+  keys:
+    - "events"
+  subkeys:
+    - "metatype"
+    - "startminutes"
+    - "praticien_id"
+    - "duration"
+    - "fauteuil"
+
+MetatypesFauteuils: # Metatypes and Fauteuls
   url: "planning/jt/journees/5/;view?json=1"
   type: json
 
@@ -71,3 +83,17 @@ recettes_annuelles:
 stat_periodes:
   url: "statistiques/stat-periodes-traitement"
   type: csv
+
+daily_calendar: #{day} format: YYYY-MM-DD
+  url: "/planning/calendar/;events_view?day={day}&mode=daily&cabinet=/config-application/cabinets/0&praticien="
+  type: json
+  keys:
+    - "events"
+  subkeys:
+    - "date"
+    - "startminutes"
+    - "duration"
+    - "praticien_id"
+    - "duration"
+    - "fauteuil"
+    - "patient_name"

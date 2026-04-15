@@ -20,10 +20,12 @@ Or as a context manager:
 
 from datetime import datetime
 
+from requests import session
 import yaml
 from OrthoABase import DownloadDir
 from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN
 from orthoaget import PROJECT_ROOT
+from orthoaget.transform import build_context, get_open_days, transform_daily_events, transform_jt
 
 URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
 
@@ -39,6 +41,9 @@ class OrthoASession:
 
         # Single connect — Chrome starts here
         self._parser = OrthoADataParse(self._download_dir)
+
+        # Give the parser access to the full urls.yaml config
+        self._parser.urlsConfig = self._all_urls
 
     def extract(self, entries: list | None = None, params: dict | None = None) -> dict:
         """
@@ -68,7 +73,6 @@ class OrthoASession:
             if params:
                 url = url.format_map(params)
             data_type = structure_config.get("type")
-            self._parser.dataKeys[structure_name] = structure_config.get("keys", None)
 
             data = None
             if data_type == "csv":
@@ -77,8 +81,6 @@ class OrthoASession:
                 data = self._parser.parseJson(url, structure_name)
             elif data_type == "html":
                 data = self._parser.parseHtml(url, structure_name)
-            elif data_type == "multi":
-                data = self._parser.parseMulti(url, structure_name)
 
             if not DEBUG_NO_DL_IN:
                 DownloadDir.clearDownloadDir(self._download_dir)
@@ -102,8 +104,25 @@ class OrthoASession:
         Returns a dict with keys: 'alldays2026', 'jt', 'metatypes', 'rdvs_history'.
         Requires entries in urls.yaml for: jt, metatypes, alldays2026, rdvs_history.
         """
-        data = self.extract(["jt", "metatypes", "alldays2026", "rdvs_history"])
+        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldays2026", "rdvs_history"])
+
+        ctx = build_context(base)
+
+        jt_tables = transform_jt(base["jt"], ctx)
+        open_days = get_open_days(base["alldays2026"])
+
+        all_events = []
+        for day in open_days:
+            daily = self.extract(["daily_calendar"], params={"day": day["date"]})
+            events = transform_daily_events(daily["daily_calendar"], base["rdvs_history"], ctx)
+            all_events.extend(events)
+
+        data = {
+            "jt": jt_tables,
+            "events": all_events
+        }
         return data
+
 
     def get_income_records(self, years = 0):
         """

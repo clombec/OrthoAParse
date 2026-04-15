@@ -1,3 +1,4 @@
+from cProfile import label
 import datetime
 from . import OrthoAdl
 import logging
@@ -22,18 +23,16 @@ class OrthoADataParse():
         else:
             self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
         self.cleanUpSwitch = {
-            "rdvs_history": self.cleanUpCsv,
-            "jt": self.cleanUpJourneesType,
-            "metatypes": self.cleanUpMetatypes,
+            "MetatypesFauteuils": self.cleanUpMetatypesFauteuils,
             "users": self.cleanUpUsers,
             "alldays2026": self.cleanUpJt2026,
-            "prothesiste": self.cleanUpCsv,
-            "recette_jour": self.cleanUpCsv,
-            "recettes_annuelles": self.cleanUpCsv,
-            "journees_type": self.cleanUpJourneesType,
-            "stat_periodes": self.cleanUpCsv,
+            "jt": self.cleanUpJt,
         }
-        self.dataKeys = {}
+        self.typeCleanUpSwitch = {
+            "csv": self.cleanUpCsv,
+            "json": self.cleanUpJson,
+        }
+        self.urlsConfig = {}
 
     def end(self):
         self.orthoAdl.end()
@@ -76,6 +75,7 @@ class OrthoADataParse():
 
         return rows
 
+
     def parseHtml(self, html_url, structure_name):
         rows = None
         htmlpage = "page_content.html"
@@ -91,74 +91,59 @@ class OrthoADataParse():
 
         return rows
 
-    def parseMulti(self, index_url, structure_name):
-        """
-        Fetches all day types from OrthoAdvance:
-        1. Downloads the index HTML page listing all day types
-        2. Extracts day type IDs from /planning/jt/journees/<n> links
-        3. For each ID, calls /planning/jt/journees/<n>/;view?json=1
-        4. Parses and aggregates results into a dict keyed by day type ID
-        """
-        outdata = {}
-        htmlpage = "page_content.html"
 
-        if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageHtml(index_url, htmlpage)  # raises OrthoADownloadError on failure
+    def _cfg(self, structure_name):
+        cfg = self.urlsConfig.get(structure_name, {})
+        return cfg.get("keys"), cfg.get("subkeys")
 
-        html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
-        if not os.path.exists(html_file):
-            logging.error(f"[parseMulti] Index file not found: {html_file}")
-            return outdata
+    def cleanUpJson(self, datain, structure_name):
+        keys, subkeys = self._cfg(structure_name)
+        if not keys:
+            return datain
+        items = datain.get(keys[0], datain)
+        if subkeys and isinstance(items, list):
+            data = [{k: item.get(k) for k in subkeys} for item in items]
+        else:             
+            data = items
+            
+        return data
 
-        with open(html_file, "r", encoding="utf-8") as f:
-            soup = BeautifulSoup(f.read(), "html.parser")
+    """
+        This clean up is specific to the JT structure :
+        extracts data from json to get each Journée Type header
+        Then launch downloand and parsing of the corresponding json for each journée type
+    """
+    def cleanUpJt(self, datain, structure_name):
+        keys, subkeys = self._cfg(structure_name)
+        if not keys:
+            return datain
+        items = datain.get(keys[0], datain)
+        if subkeys and isinstance(items, list):
+            data = [{k: item.get(k) for k in subkeys} for item in items]
+        else:             
+            return items
 
-        # Extract unique day type IDs and their labels from anchor links
-        journee_ids = []  # list of (id, label) tuples
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            if 'planning/preparation/jtypes/' in href:
-                match = re.search(r'/jtypes/(\d+)', href)
-                if match:
-                    jid = int(match.group(1))
-                    if jid not in [j[0] for j in journee_ids]:
-                        nav_title = link.find('span', class_='nav-title')
-                        label = nav_title.get_text(strip=True) if nav_title else None
-                        journee_ids.append((jid, label))
-
-        logging.info(f"[parseMulti] {len(journee_ids)} day types found: {[j[0] for j in journee_ids]}")
-
-        # Fetch and parse each day type individually
-        for jid, label in journee_ids:
-            json_url = f"/planning/calendar/;events_view?jt=/planning/jt/journees/{jid}&mode=jt&cabinet=/config-application/cabinets/0"
-            logging.info(f"[parseMulti] Parsing day type {jid} ({label})...")
+        jtdata = {}
+        for item in data:
+            jid = int(item.get("name", ""))
+            label = item.get('title')
+            jt_json_url = self.urlsConfig.get("jt1", {}).get("url", "").format(jid=jid)
+            logging.info(f"[cleanUpJt] Parsing day type {jid} ({label}, get url {jt_json_url})...")
             try:
-                rows = self.parseJson(json_url, structure_name)
+                rows = self.parseJson(jt_json_url, "jt1")  # This will download and parse the JSON for this journée type
             except OrthoAdl.OrthoADownloadError as e:
                 # Log and skip this day type — don't abort the whole multi fetch
-                logging.warning(f"[parseMulti] Skipping day type {jid}: {e}")
+                logging.warning(f"[cleanUpJt] Skipping day type {jid}: {e}")
                 continue
             if rows is not None:
-                outdata[label] = rows
+                jtdata[label] = rows
 
-        logging.info(f"[parseMulti] Done — {len(outdata)} day types parsed")
-        return outdata
-
-    def cleanUpJourneesType(self, datain, structure_name):
-        keys = self.dataKeys.get(structure_name)
-        outdata = []
-        if keys is None:
-            logging.error(f"Error: dataKeys for {structure_name} is not defined")
-            return []
-        for item in datain.get("events", []):
-            line = {k: item.get(k) for k in keys}
-            outdata.append(line)
-
-        return {'events':outdata}
+        logging.info(f"[cleanUpJt] JT Done — {len(jtdata)} day types parsed")
+        return jtdata
 
 
     def cleanUpCsv(self, dfin, structure_name):
-        keys = self.dataKeys.get(structure_name)
+        keys, _ = self._cfg(structure_name)
         if keys is None:
             df_filtered = dfin  # no keys defined — keep all columns
         else:
@@ -219,49 +204,46 @@ class OrthoADataParse():
 
         return data
 
-    def cleanUpCalendarEvents(self, datain, structure_name):
-        events = datain["events"]
-        keys = self.dataKeys.get(structure_name)
-
-        #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)):
-            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
-            return []
-
-        # Filter data from input based on keys defined in url.yaml for this structure
-        # Keep only the whitelisted columns for calendaring events.
-        filtered_data = [
-            {k: d[k] for k in keys if k in d}
-            for d in events
-        ]
-
-        return filtered_data
-
     """
-    This clean up is specific to the metatypes structure, a JSON file with a specific format.
-    The data cannot be retrieved with a single list of keys as they're nested, hence the parsing must be hardcoded
+    This clean up is specific to config structure, a JSON file with a specific format, including Metatypes description and Fauteuils list
+    The data cannot be retrieved with a single list of keys or subkeys as they're nested and several configs are included, hence the parsing must be hardcoded
     """
-    def cleanUpMetatypes(self, datain, structure_name):
+    def cleanUpMetatypesFauteuils(self, datain, structure_name):
         journees = datain
 
         sequences = journees["sequences"]
         metatypes_list = journees["enumerates"]["metatypes"]["list"]
+        fauteuils_list = journees["enumerates"]["fauteuils"]["list"]
 
         out_struct = {}
+        data = {}
 
         for key, roles in sequences.items():
             metatype_id = int(key.split("/")[-1])
-            out_struct[metatype_id] = roles.copy()
+            data[metatype_id] = roles.copy()
 
         for meta in metatypes_list:
             metatype_id = int(meta["name"].split("/")[-1])
 
-            out_struct.setdefault(metatype_id, {})
-            out_struct[metatype_id].update({
+            data.setdefault(metatype_id, {})
+            data[metatype_id].update({
                 "value": meta.get("value"),
                 "duree": meta.get("duree"),
                 "color": meta.get("color"),
             })
+
+        out_struct["metatypes"] = data
+
+        data = {}
+
+        for item in fauteuils_list:
+            fauteuil_id = int(item["name"])
+            data.setdefault("fauteuils", {})
+            data["fauteuils"][fauteuil_id] = {
+                "value": item.get("value"),
+            }
+
+        out_struct["fauteuils"] = data
 
         return out_struct
 
@@ -271,8 +253,7 @@ class OrthoADataParse():
     """
     def cleanUpUsers(self, dfin, structure_name):
         out_struct = []
-        # Get the keys for this structure from the dataKeys dictionary, listed in url.yaml.
-        keys = self.dataKeys.get(structure_name)
+        keys, _ = self._cfg(structure_name)
 
         #To avoid not subscriptable error if keys is not defined or not a list/tuple
         if keys is None or not isinstance(keys, (list, tuple)):
@@ -315,8 +296,7 @@ class OrthoADataParse():
         # get the headers of the table
         headers = [th.get_text(strip=True) for th in table.thead.find_all('th')]
 
-        # extract the keys for this structure from the dataKeys dictionary, listed in url.yaml. These keys correspond to the column names in the HTML table that we want to keep.
-        keys = self.dataKeys.get(structure_name)
+        keys, _ = self._cfg(structure_name)
 
         #To avoid not subscriptable error if keys is not defined or not a list/tuple
         if keys is None or not isinstance(keys, (list, tuple)):
@@ -340,7 +320,12 @@ class OrthoADataParse():
     If no specific cleanup function is defined for a structure, it returns the input data unchanged.
     """
     def cleanUp(self, datain, structure_name):
-        return self.cleanUpSwitch.get(structure_name, lambda x, y: x)(datain, structure_name)
+        if structure_name in self.cleanUpSwitch:
+            return self.cleanUpSwitch[structure_name](datain, structure_name)
+        data_type = self.urlsConfig.get(structure_name, {}).get("type")
+        if data_type in self.typeCleanUpSwitch:
+            return self.typeCleanUpSwitch[data_type](datain, structure_name)
+        return datain
 
 def main():
         print("nothing to see here, just the OrthoAData module with its OrthoADataParse class")
