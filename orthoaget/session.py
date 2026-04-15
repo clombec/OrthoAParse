@@ -18,7 +18,9 @@ Or as a context manager:
         data = session.extract(["prothesiste", "users"])
 """
 
+import json
 from datetime import datetime
+from pathlib import Path
 
 from requests import session
 import yaml
@@ -28,6 +30,7 @@ from orthoaget import PROJECT_ROOT
 from orthoaget.transform import build_context, get_open_days, transform_daily_events, transform_jt
 
 URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
+USERS_DB_FILE = Path(PROJECT_ROOT) / "users_db.json"
 
 class OrthoASession:
     def __init__(self, urls_file: str = URLS_FILE):
@@ -123,6 +126,32 @@ class OrthoASession:
         }
         return data
 
+    def _load_users_db(self) -> dict:
+        """Load the local users DB {str(id): name} from disk, or return empty dict."""
+        if USERS_DB_FILE.exists():
+            with open(USERS_DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+    def _build_users_db(self) -> dict:
+        """Fetch users from OrthoAdvance and save to local DB."""
+        users = self.extract(["users"])["users"]
+        db = {str(u["id"]): u["name"] for u in users}
+        with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(db, f, ensure_ascii=False, indent=2)
+        return db
+
+    def get_name_by_id(self, user_id: int) -> str | None:
+        """
+        Return the name for a given user id.
+        Looks up the local DB first; rebuilds it from OrthoAdvance if not found.
+        """
+        db = self._load_users_db()
+        key = str(user_id)
+        if key in db:
+            return db[key]
+        db = self._build_users_db()
+        return db.get(key)
 
     def get_income_records(self, years = 0):
         """
