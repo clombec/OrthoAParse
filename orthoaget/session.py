@@ -122,7 +122,8 @@ class OrthoASession:
 
         data = {
             "jt": jt_tables,
-            "events": all_events
+            "events": all_events,
+            "alldays2026": open_days,
         }
         return data
 
