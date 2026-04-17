@@ -128,31 +128,41 @@ class OrthoASession:
         return data
 
     def _load_users_db(self) -> dict:
-        """Load the local users DB {str(id): name} from disk, or return empty dict."""
+        """Load the local users DB {str(id): {name, user_color, ...}} from disk, or return empty dict."""
         if USERS_DB_FILE.exists():
             with open(USERS_DB_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {}
 
     def _build_users_db(self) -> dict:
-        """Fetch users from OrthoAdvance and save to local DB."""
+        """Fetch users from OrthoAdvance, enrich with user_params, and save to local DB."""
         users = self.extract(["users"])["users"]
-        db = {str(u["id"]): u["name"] for u in users}
+        db = {str(u["id"]): {"name": u["name"]} for u in users}
+
+        # Fetch per-user params (user_color, etc.) — URL must be set in urls.yaml
+        for user_id in db:
+            try:
+                params_data = self.extract(["user_params"], params={"user_id": user_id}).get("user_params", {})
+                db[user_id].update(params_data)
+            except Exception:
+                pass  # Params not available for this user — leave defaults
+
         with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
         return db
 
-    def get_name_by_id(self, user_id: int) -> str | None:
-        """
-        Return the name for a given user id.
-        Looks up the local DB first; rebuilds it from OrthoAdvance if not found.
-        """
+    def get_user_by_id(self, user_id: int) -> dict | None:
+        """Return the full user record {name, user_color, ...} for a given id."""
         db = self._load_users_db()
         key = str(user_id)
-        if key in db:
-            return db[key]
-        db = self._build_users_db()
+        if key not in db:
+            db = self._build_users_db()
         return db.get(key)
+
+    def get_name_by_id(self, user_id: int) -> str | None:
+        """Return the name for a given user id."""
+        user = self.get_user_by_id(user_id)
+        return user.get("name") if user else None
 
     def get_income_records(self, years = 0):
         """

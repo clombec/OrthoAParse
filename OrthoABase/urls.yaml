@@ -2,33 +2,29 @@ rdvs_history:
   url: "rdvs/rdvs/history"
   type: csv
   keys:
-    - "Patient"
-    - "Date et heure du RDV"
-    - "Plage planning"
-    - "Praticien"
+    - ["Patient"]
+    - ["Date et heure du RDV"]
+    - ["Plage planning"]
+    - ["Praticien"] 
 
 jt:  # All journées types
   url: "planning/;jtypes_json_view"
   type: json
   keys:
-    - "jtypes"
-  subkeys:
-    - "title"
-    - "abspath"
-    - "name"
-    - "color"
+    - ["jtypes", "title"]
+    - ["jtypes", "abspath"]
+    - ["jtypes", "name"]
+    - ["jtypes", "color"]
 
 jt1:  # Single journée type
   url: "/planning/calendar/;events_view?jt=/planning/jt/journees/{jid}&mode=jt&cabinet=/config-application/cabinets/0"
   type: json
   keys:
-    - "events"
-  subkeys:
-    - "metatype"
-    - "startminutes"
-    - "praticien_id"
-    - "duration"
-    - "fauteuil"
+    - ["events", "metatype"]
+    - ["events", "startminutes"]
+    - ["events", "praticien_id"]
+    - ["events", "duration"]
+    - ["events", "fauteuil"]
 
 MetatypesFauteuils: # Metatypes and Fauteuls
   url: "planning/jt/journees/5/;view?json=1"
@@ -38,47 +34,47 @@ users:
   url: "users/recherche"
   type: csv
   keys:
-    - "Nom"
-    - "Nom.1"
-    - "Prénom"
+    - ["Nom"]
+    - ["Nom.1"]
+    - ["Prénom"]
 
 alldays2026:
   url: "planning/agenda/2026/;view_days"
   type: html
   keys:
-    - "Titre"
-    - "Journée type"
-    - "Cabinet ouvert ?"
+    - ["Titre"]
+    - ["Journée type"]
+    - ["Cabinet ouvert ?"]
 
 prothesiste:
   url: "medical/prothesiste/planning"
   type: csv
   keys:
-    - "Prothésiste"
-    - "Patient"
-    - "Date du rdv"
-    - "Acte prothésiste"
-    - "Date d'envoi au labo"
-    - "Date de réception"
-    - "PE"
-    - "Durée"
-    - "Commentaires"
+    - ["Prothésiste"]
+    - ["Patient"]
+    - ["Date du rdv"]   
+    - ["Acte prothésiste"]
+    - ["Date d'envoi au labo"]
+    - ["Date de réception"]
+    - ["PE"]
+    - ["Durée"]
+    - ["Commentaires"]
 
 recette_jour:
   url: "reglements/history/"
   type: csv
   keys:
-    - "Montant"
-    - "Réglé le"
-    - "Encaissé"
+    - ["Montant"]
+    - ["Réglé le"]
+    - ["Encaissé"]
 
 recettes_annuelles:
   url: "reglements/history/;yearly_view?doperation_year={year}&dcashed_year=&receveur=&cabinet=&batch_size=60&payment_way=&cashed=1&cancelled_any=0&action=search"
   type: csv
   keys:
-    - "Montant"
-    - "Réglé le"
-    - "Encaissé"
+    - ["Montant"]
+    - ["Réglé le"]
+    - ["Encaissé"]
 
 stat_periodes:
   url: "statistiques/stat-periodes-traitement"
@@ -88,12 +84,15 @@ daily_calendar: #{day} format: YYYY-MM-DD
   url: "/planning/calendar/;events_view?day={day}&mode=daily&cabinet=/config-application/cabinets/0&praticien="
   type: json
   keys:
-    - "events"
-  subkeys:
-    - "date"
-    - "startminutes"
-    - "duration"
-    - "praticien_id"
-    - "duration"
-    - "fauteuil"
-    - "patient_name"
+    - ["events", "date"]
+    - ["events", "startminutes"]
+    - ["events", "duration"]
+    - ["events", "praticien_id"]
+    - ["events", "fauteuil"]
+    - ["events", "patient_name"]
+
+user_params:
+  url: "users/{user_id}/;view_json?keys=user_color" 
+  type: json
+  keys:
+    - ["user", "user_color"]

@@ -1,4 +1,5 @@
-from cProfile import label
+from functools import reduce
+from operator import getitem
 import datetime
 from . import OrthoAdl
 import logging
@@ -94,19 +95,42 @@ class OrthoADataParse():
 
     def _cfg(self, structure_name):
         cfg = self.urlsConfig.get(structure_name, {})
-        return cfg.get("keys"), cfg.get("subkeys")
+        keys = cfg.get("keys")
+        if keys is not None:
+            assert all(isinstance(k, list) for k in keys), \
+                f"[{structure_name}] all keys must be lists, got: {keys}"
+        return keys
+
+    def _get_by_path(self, data, path: list):
+        """
+        Navigate a nested dict using a list of keys.
+        Returns (field_name, value) where field_name is the last key in the path.
+        The terminal value can be a scalar or a list.
+        Example: ["user", "user_color"] -> ("user_color", "red")
+        """
+        return path[-1], reduce(getitem, path, data)
 
     def cleanUpJson(self, datain, structure_name):
-        keys, subkeys = self._cfg(structure_name)
+        keys = self._cfg(structure_name)
         if not keys:
             return datain
-        items = datain.get(keys[0], datain)
-        if subkeys and isinstance(items, list):
-            data = [{k: item.get(k) for k in subkeys} for item in items]
-        else:             
-            data = items
-            
-        return data
+
+        # Group keys by prefix (path minus last element)
+        groups = {}
+        for path in keys:
+            prefix = tuple(path[:-1])
+            groups.setdefault(prefix, []).append(path[-1])
+
+        # Single prefix: navigate once, extract all fields
+        if len(groups) == 1:
+            prefix, fields = next(iter(groups.items()))
+            obj = reduce(getitem, prefix, datain) if prefix else datain
+            if isinstance(obj, list):
+                return [{f: item.get(f) for f in fields} for item in obj]
+            return {f: obj.get(f) for f in fields}
+
+        # Multiple prefixes: flat dict, each path resolved independently
+        return {path[-1]: reduce(getitem, path, datain) for path in keys}
 
     """
         This clean up is specific to the JT structure :
@@ -114,17 +138,17 @@ class OrthoADataParse():
         Then launch downloand and parsing of the corresponding json for each journée type
     """
     def cleanUpJt(self, datain, structure_name):
-        keys, subkeys = self._cfg(structure_name)
+        keys = self._cfg(structure_name)
         if not keys:
             return datain
-        items = datain.get(keys[0], datain)
-        if subkeys and isinstance(items, list):
-            data = [{k: item.get(k) for k in subkeys} for item in items]
-        else:             
+        # Navigate to the list itself (strip the last field segment)
+        list_path = keys[0][:-1] if len(keys[0]) > 1 else keys[0]
+        _, items = self._get_by_path(datain, list_path)
+        if not isinstance(items, list):
             return items
 
         jtdata = {}
-        for item in data:
+        for item in items:
             jid = int(item.get("name", ""))
             label = item.get('title')
             jt_json_url = self.urlsConfig.get("jt1", {}).get("url", "").format(jid=jid)
@@ -143,12 +167,12 @@ class OrthoADataParse():
 
 
     def cleanUpCsv(self, dfin, structure_name):
-        keys, _ = self._cfg(structure_name)
+        keys = self._cfg(structure_name)
         if keys is None:
             df_filtered = dfin  # no keys defined — keep all columns
         else:
-            # Keep only columns defined in keys
-            df_filtered = dfin.loc[:, dfin.columns.intersection(keys)]
+            col_names = [k[0] for k in keys]
+            df_filtered = dfin.loc[:, dfin.columns.intersection(col_names)]
 
         if isinstance(df_filtered, pd.Series):
             df_filtered = df_filtered.to_frame()
@@ -253,34 +277,44 @@ class OrthoADataParse():
     """
     def cleanUpUsers(self, dfin, structure_name):
         out_struct = []
-        keys, _ = self._cfg(structure_name)
+        keys = self._cfg(structure_name)
 
-        #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)):
-            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
+        if keys is None:
+            logging.error(f"Error: dataKeys for {structure_name} is not defined")
             return out_struct
 
-        # Filter the DataFrame to keep only the columns specified in keys for this structure. This assumes that the keys are the column names in the DataFrame.
-        df_filtered = dfin.loc[:, keys]
+        col_names = [k[0] for k in keys]
+        df_filtered = dfin.loc[:, col_names]
 
-        # If the result is a Series (which happens if there's only one column), convert it to a DataFrame to ensure consistent processing. This is necessary because the next steps expect a DataFrame structure, even if it's just one column.
         if isinstance(df_filtered, pd.Series):
-            # Convert the Series to a DataFrame, which will have one column with the name of the original Series.
             df_filtered = df_filtered.to_frame()
 
-        # Convert the filtered DataFrame to a list of dictionaries, where each dictionary represents a row with column names as keys. This makes it easier to iterate over the data and extract the relevant information for each user.
         df_records = df_filtered.to_dict(orient="records")
 
-        patientId = keys[0]  # Assuming the first key is the user ID
-        lastName = keys[1]   # Assuming the second key is the last name
-        firstName = keys[2]  # Assuming the third key is the first name
+        patientId = col_names[0]
+        lastName = col_names[1]
+        firstName = col_names[2]
 
         for user in df_records:
-            # Create out structure with only the user ID and the full name "Prénom Nom"
-            out_struct.append({
-                "id": user.get(patientId),  # Assuming the first key is the user ID
+            user_id = user.get(patientId)
+            udata = {
+                "id": user_id,  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
-            })
+            }
+            # Create out structure with the user ID and the full name "Prénom Nom"
+            # Add to this structure all params from the url user_params (from urls.yaml)
+            jt_json_url = self.urlsConfig.get("user_params", {}).get("url", "").format(user_id=user_id)
+            logging.info(f"[cleanUpUsers] Parsing user params for user {user_id}...")
+            try:
+                params = self.parseJson(jt_json_url, "user_params")  # This will download and parse the JSON for this user
+            except OrthoAdl.OrthoADownloadError as e:
+                # Log and skip this user — don't abort the whole multi fetch
+                logging.warning(f"[cleanUpUsers] Skipping user {user_id}: {e}")
+                continue
+            if params is not None:
+                udata.update(params)
+
+            out_struct.append(udata)
         return out_struct
 
     """
@@ -296,15 +330,14 @@ class OrthoADataParse():
         # get the headers of the table
         headers = [th.get_text(strip=True) for th in table.thead.find_all('th')]
 
-        keys, _ = self._cfg(structure_name)
+        keys = self._cfg(structure_name)
 
-        #To avoid not subscriptable error if keys is not defined or not a list/tuple
-        if keys is None or not isinstance(keys, (list, tuple)):
-            logging.error(f"Error: dataKeys for {structure_name} is not subscriptable")
+        if keys is None:
+            logging.error(f"Error: dataKeys for {structure_name} is not defined")
             return out_struct
 
-        # get the indexes of the columns to keep based on the headers and the keys
-        indexes = [headers.index(col) for col in keys]
+        col_names = [k[0] for k in keys]
+        indexes = [headers.index(col) for col in col_names]
 
         # Iterate over the rows of the table body and extract the text of the cells corresponding to the indexes of the columns to keep, then append the cleaned data to the output structure as a list of lists.
         for row in table.tbody.find_all('tr'):
