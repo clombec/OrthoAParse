@@ -159,21 +159,12 @@ class OrthoASession:
         user = self.get_user_by_id(user_id)
         return user.get("name") if user else None
 
-    def get_income_records(self, years = 0):
+    def get_income_records(self, dayin = datetime.now().strftime("%Y-%m-%d"), dayout = datetime.now().strftime("%Y-%m-%d")) -> list:
         """
-        Get <years> last years of income data. Default is 0, which means only today. 1 is this year, 2 is this year and last year...
+        Get income data for a specific date range. Default : today only
         """
-        if years > 0:
-            i = years
-            full_data = []
-            while i > 0:
-                data = self.extract(["recettes_annuelles"], params={"year": str(datetime.now().year-(i-1))})
-                full_data.extend(data['recettes_annuelles'])
-                i -= 1
-            return full_data
-        else:
-            data = self.extract(["recette_jour"])
-            return data["recette_jour"]
+        data = self.extract(["recette_jour"], params={"dayin": dayin, "dayout": dayout})
+        return data["recette_jour"]
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""
