@@ -7,7 +7,7 @@ Entry points
 ------------
 build_context(data)          -- build lookup tables from raw session data
 transform_jt(jt, ctx)        -- resolve metatypes and fauteuils in journées types
-get_open_days(alldays2026)   -- list of (YYYY-MM-DD, jt_name) for open days
+get_open_days(alldaysyear)   -- list of (YYYY-MM-DD, jt_name) for open days
 transform_daily_events(daily_calendar, rdvs_history, ctx)
                              -- anonymize one day's calendar events
 
@@ -156,13 +156,13 @@ def _parse_fr_date(label: str) -> str | None:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
-def get_open_days(alldays2026: list) -> list[dict]:
+def get_open_days(alldaysyear: list) -> list[dict]:
     """
-    Filter open days from alldays2026, keeping today and future days only.
+    Filter open days from alldaysyear, keeping today and future days only.
 
     Parameters
     ----------
-    alldays2026 : list of [label, jt_name, status]
+    alldaysyear : list of [label, jt_name, status]
 
     Returns
     -------
@@ -171,7 +171,7 @@ def get_open_days(alldays2026: list) -> list[dict]:
     """
     today = datetime.now(_TZ_PARIS).date()
     open_days = []
-    for row in alldays2026:
+    for row in alldaysyear:
         label, jt_name, status = row[0], row[1], row[2]
         if status.strip() != "Ouvert":
             continue

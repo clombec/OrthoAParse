@@ -10,3 +10,5 @@ downloads
 data.json
 logs
 *.egg-info
+users_db.json
+toto.*

@@ -26,7 +26,7 @@ class OrthoADataParse():
         self.cleanUpSwitch = {
             "MetatypesFauteuils": self.cleanUpMetatypesFauteuils,
             "users": self.cleanUpUsers,
-            "alldays2026": self.cleanUpJt2026,
+            "alldaysyear": self.cleanUpJtYear,
             "jt": self.cleanUpJt,
         }
         self.typeCleanUpSwitch = {
@@ -321,7 +321,7 @@ class OrthoADataParse():
     This clean up is specific to the JT2026 structure, which is an HTML table with a specific format. It extracts the relevant columns based on the keys defined in url.yaml for this structure, and returns a list of lists containing the cleaned data.
     It is base don a beautiful soup object, which is passed to the cleanUp function
     """
-    def cleanUpJt2026(self, soupin, structure_name):
+    def cleanUpJtYear(self, soupin, structure_name):
         out_struct = []
 
         # Get the html table with id "browse-list"

@@ -104,15 +104,16 @@ class OrthoASession:
     def get_calendar_records(self) -> dict:
         """
         Fetch the full planning configuration from OrthoAdvance.
-        Returns a dict with keys: 'alldays2026', 'jt', 'metatypes', 'rdvs_history'.
-        Requires entries in urls.yaml for: jt, metatypes, alldays2026, rdvs_history.
+        Returns a dict with keys: 'alldaysyear', 'jt', 'metatypes', 'rdvs_history'.
+        Requires entries in urls.yaml for: jt, metatypes, alldaysyear, rdvs_history.
         """
-        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldays2026", "rdvs_history"])
-
+        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params = {"year": datetime.now().strftime("%y")})
+        days_next_year = self.extract(["alldaysyear"], params = {"year": str(int(datetime.now().strftime("%y"))+1)})
+        base["alldaysyear"].extend(days_next_year["alldaysyear"])
         ctx = build_context(base)
 
         jt_tables = transform_jt(base["jt"], ctx)
-        open_days = get_open_days(base["alldays2026"])
+        open_days = get_open_days(base["alldaysyear"])
 
         all_events = []
         for day in open_days:
@@ -123,7 +124,7 @@ class OrthoASession:
         data = {
             "jt": jt_tables,
             "events": all_events,
-            "alldays2026": open_days,
+            "alldaysyear": open_days,
         }
         return data
 
@@ -134,25 +135,19 @@ class OrthoASession:
                 return json.load(f)
         return {}
 
-    def _build_users_db(self) -> dict:
-        """Fetch users from OrthoAdvance, enrich with user_params, and save to local DB."""
-        users = self.extract(["users"])["users"]
-        db = {str(u["id"]): {"name": u["name"]} for u in users}
-
-        # Fetch per-user params (user_color, etc.) — URL must be set in urls.yaml
-        for user_id in db:
-            try:
-                params_data = self.extract(["user_params"], params={"user_id": user_id}).get("user_params", {})
-                db[user_id].update(params_data)
-            except Exception:
-                pass  # Params not available for this user — leave defaults
-
+    def _save_users_db(self, db: dict) -> None:
         with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
+
+    def _build_users_db(self) -> dict:
+        """Fetch users from OrthoAdvance (already enriched with user_params by cleanUpUsers) and save to DB."""
+        users = self.extract(["users"])["users"]
+        db = {str(u["id"]): {k: v for k, v in u.items() if k != "id"} for u in users}
+        self._save_users_db(db)
         return db
 
     def get_user_by_id(self, user_id: int) -> dict | None:
-        """Return the full user record {name, user_color, ...} for a given id."""
+        """Return the full user record {name, user_color, ...} for a given id. Fetches from DB first."""
         db = self._load_users_db()
         key = str(user_id)
         if key not in db:

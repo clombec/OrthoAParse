@@ -99,7 +99,7 @@ def ask_webhook_gui():
 def run():
     try:
         with OrthoASession() as session:
-            data = session.extract(["recette_jour"])
+            data = session.extract(["recette_jour"], params={"dayin": datetime.now().strftime("%Y-%m-%d"), "dayout": datetime.now().strftime("%Y-%m-%d")})
     except OrthoAdl.OrthoAConnectionError as e:
         logging.error(f"Erreur de connexion à OrthoAdvance : {e}")
         return 0
