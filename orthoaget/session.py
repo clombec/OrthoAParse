@@ -22,7 +22,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from requests import session
 import yaml
 from OrthoABase import DownloadDir
 from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN

@@ -1,6 +1,6 @@
 from functools import reduce
 from operator import getitem
-import datetime
+from datetime import datetime
 from . import OrthoAdl
 import logging
 import os
@@ -8,7 +8,6 @@ import csv
 import pandas as pd
 import json
 from bs4 import BeautifulSoup
-from datetime import datetime
 import re
 
 DEBUG_NO_DL_IN = False
@@ -142,7 +141,9 @@ class OrthoADataParse():
         if not keys:
             return datain
         # Navigate to the list itself (strip the last field segment)
-        list_path = keys[0][:-1] if len(keys[0]) > 1 else keys[0]
+        first = keys[0]
+        assert len(first) >= 1, f"[cleanUpJt] key path must not be empty, got {first}"
+        list_path = first[:-1] if len(first) > 1 else first
         _, items = self._get_by_path(datain, list_path)
         if not isinstance(items, list):
             return items

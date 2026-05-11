@@ -251,12 +251,7 @@ def transform_daily_events(daily_calendar: list, rdvs_history: list, ctx: dict) 
         if patient_id is not None:
             dt_key = _normalize_dt(ev.get("date", ""))
             if (patient_id, dt_key) not in rdvs_index:
-                with open("mismatch.txt", "a") as f:
-                    f.write(f"Mismatch: patient_id={patient_id}, date={dt_key}\n")
-#            assert (patient_id, dt_key) in rdvs_index, (
-#                f"daily_calendar event (patient_id={patient_id}, date={dt_key}) "
-#                f"not found in rdvs_history, rdvs_index={rdvs_index}"
-#            )
+                logging.warning(f"[transform] Event not in rdvs_history: patient_id={patient_id}, date={dt_key}")
 
         result.append({
             "date": ev.get("date"),
