@@ -22,7 +22,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from requests import session
 import yaml
 from OrthoABase import DownloadDir
 from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN
@@ -100,19 +99,72 @@ class OrthoASession:
     def get_users_records(self):
         data = self.extract(["users"])
         return data['users']
+    
+    def get_stats_records(self) -> dict:
+        """
+        Build per-patient stats from rdvs_all and users.
+
+        Returns
+        -------
+        {str(patient_id): {
+            "rdvs": [{"date": "YYYY-MM-DD", "temps_praticien": int, "temps_total": int}, ...],
+            <user_params except name>   # user_statistics_group, archive_delay, ...
+        }}
+        Patients are identified by ID only — no name in output.
+        """
+        data = self.extract(["users", "rdvs_all", "MetatypesFauteuils"])
+
+        users     = data.get("users", [])
+        rdvs      = data.get("rdvs_all", [])
+        metatypes = data.get("MetatypesFauteuils", {}).get("metatypes", {})
+
+        # Plage planning value (e.g. "P55") -> {temps_praticien, temps_total}
+        plage_lookup = {
+            v["value"]: {"temps_praticien": v.get("dr", 0), "temps_total": v.get("duree", 0)}
+            for v in metatypes.values()
+        }
+
+        # Patient name (title-cased) -> id
+        name_to_id = {u["name"].strip().title(): u["id"] for u in users}
+
+        # Init result with user params — no id, no name
+        result = {
+            str(u["id"]): {k: v for k, v in u.items() if k not in ("id", "name")} | {"rdvs": []}
+            for u in users
+        }
+
+        for rdv in rdvs:
+            patient_name = rdv.get("Patient", "").strip().title()
+            patient_id = name_to_id.get(patient_name)
+            if patient_id is None:
+                continue
+
+            dt_str = rdv.get("Date et heure du RDV", "")
+            try:
+                date = datetime.strptime(dt_str, "%d/%m/%Y %Hh%M").date().isoformat()
+            except ValueError:
+                date = dt_str[:10]
+
+            plage = rdv.get("Plage planning", "")
+            times = plage_lookup.get(plage, {"temps_praticien": None, "temps_total": None})
+
+            result[str(patient_id)]["rdvs"].append({"date": date, "plage": plage, **times})
+
+        return result
 
     def get_calendar_records(self) -> dict:
         """
         Fetch the full planning configuration from OrthoAdvance.
-        Returns a dict with keys: 'alldays2026', 'jt', 'metatypes', 'rdvs_history'.
-        Requires entries in urls.yaml for: jt, metatypes, alldays2026, rdvs_history.
+        Returns a dict with keys: 'alldaysyear', 'jt', 'metatypes', 'rdvs_history'.
+        Requires entries in urls.yaml for: jt, metatypes, alldaysyear, rdvs_history.
         """
-        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldays2026", "rdvs_history"])
-
+        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params = {"year": datetime.now().strftime("%Y")})
+        days_next_year = self.extract(["alldaysyear"], params = {"year": str(int(datetime.now().strftime("%Y"))+1)})
+        base["alldaysyear"].extend(days_next_year["alldaysyear"])
         ctx = build_context(base)
 
         jt_tables = transform_jt(base["jt"], ctx)
-        open_days = get_open_days(base["alldays2026"])
+        open_days = get_open_days(base["alldaysyear"])
 
         all_events = []
         for day in open_days:
@@ -123,7 +175,7 @@ class OrthoASession:
         data = {
             "jt": jt_tables,
             "events": all_events,
-            "alldays2026": open_days,
+            "alldaysyear": open_days,
         }
         return data
 
@@ -134,25 +186,19 @@ class OrthoASession:
                 return json.load(f)
         return {}
 
-    def _build_users_db(self) -> dict:
-        """Fetch users from OrthoAdvance, enrich with user_params, and save to local DB."""
-        users = self.extract(["users"])["users"]
-        db = {str(u["id"]): {"name": u["name"]} for u in users}
-
-        # Fetch per-user params (user_color, etc.) — URL must be set in urls.yaml
-        for user_id in db:
-            try:
-                params_data = self.extract(["user_params"], params={"user_id": user_id}).get("user_params", {})
-                db[user_id].update(params_data)
-            except Exception:
-                pass  # Params not available for this user — leave defaults
-
+    def _save_users_db(self, db: dict) -> None:
         with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
+
+    def _build_users_db(self) -> dict:
+        """Fetch users from OrthoAdvance (already enriched with user_params by cleanUpUsers) and save to DB."""
+        users = self.extract(["users"])["users"]
+        db = {str(u["id"]): {k: v for k, v in u.items() if k != "id"} for u in users}
+        self._save_users_db(db)
         return db
 
     def get_user_by_id(self, user_id: int) -> dict | None:
-        """Return the full user record {name, user_color, ...} for a given id."""
+        """Return the full user record {name, user_color, ...} for a given id. Fetches from DB first."""
         db = self._load_users_db()
         key = str(user_id)
         if key not in db:
@@ -164,21 +210,12 @@ class OrthoASession:
         user = self.get_user_by_id(user_id)
         return user.get("name") if user else None
 
-    def get_income_records(self, years = 0):
+    def get_income_records(self, dayin = datetime.now().strftime("%Y-%m-%d"), dayout = datetime.now().strftime("%Y-%m-%d")) -> list:
         """
-        Get <years> last years of income data. Default is 0, which means only today. 1 is this year, 2 is this year and last year...
+        Get income data for a specific date range. Default : today only
         """
-        if years > 0:
-            i = years
-            full_data = []
-            while i > 0:
-                data = self.extract(["recettes_annuelles"], params={"year": str(datetime.now().year-(i-1))})
-                full_data.extend(data['recettes_annuelles'])
-                i -= 1
-            return full_data
-        else:
-            data = self.extract(["recette_jour"])
-            return data["recette_jour"]
+        data = self.extract(["recette_jour"], params={"dayin": dayin, "dayout": dayout})
+        return data["recette_jour"]
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""

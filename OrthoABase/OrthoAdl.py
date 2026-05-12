@@ -9,7 +9,6 @@ This script uses Selenium to automate the web browser interactions.
 """
 
 from socket import timeout
-from symtable import Class
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -70,7 +69,7 @@ class OrthoAdl():
                 el = d.find_element(By.ID, "users-0")
                 if el.is_displayed() and el.is_enabled():
                     return ("user_page", el)
-            except:
+            except Exception:
                 pass
 
             if d.find_elements(By.ID, "password"):
@@ -101,7 +100,6 @@ class OrthoAdl():
             except Exception:
                 # ChromeDriver cache may be stale (e.g. after a Chrome update) — force re-download and retry once
                 logging.warning("ChromeDriver failed to start — clearing cache and retrying...")
-                ChromeDriverManager().install.__func__  # flush not needed, just reinstall with cache_valid=0
                 self.driver = webdriver.Chrome(
                     service=Service(ChromeDriverManager(cache_valid_range=0).install()),
                     options=chrome_options

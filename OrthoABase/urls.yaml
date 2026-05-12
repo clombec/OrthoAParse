@@ -5,7 +5,16 @@ rdvs_history:
     - ["Patient"]
     - ["Date et heure du RDV"]
     - ["Plage planning"]
-    - ["Praticien"] 
+    - ["Praticien"]
+
+rdvs_all:
+  url: "rdvs/rdvs/history/;view_rdvs_all"
+  type: csv
+  keys:
+    - ["Patient"]
+    - ["Date et heure du RDV"]
+    - ["Plage planning"]
+    - ["Praticien"]
 
 jt:  # All journées types
   url: "planning/;jtypes_json_view"
@@ -38,8 +47,8 @@ users:
     - ["Nom.1"]
     - ["Prénom"]
 
-alldays2026:
-  url: "planning/agenda/2026/;view_days"
+alldaysyear:
+  url: "planning/agenda/{year}/;view_days"
   type: html
   keys:
     - ["Titre"]
@@ -61,15 +70,7 @@ prothesiste:
     - ["Commentaires"]
 
 recette_jour:
-  url: "reglements/history/"
-  type: csv
-  keys:
-    - ["Montant"]
-    - ["Réglé le"]
-    - ["Encaissé"]
-
-recettes_annuelles:
-  url: "reglements/history/;yearly_view?doperation_year={year}&dcashed_year=&receveur=&cabinet=&batch_size=60&payment_way=&cashed=1&cancelled_any=0&action=search"
+  url: "reglements/history/;search?doperation={dayin}&doperation={dayout}"
   type: csv
   keys:
     - ["Montant"]
@@ -90,9 +91,21 @@ daily_calendar: #{day} format: YYYY-MM-DD
     - ["events", "praticien_id"]
     - ["events", "fauteuil"]
     - ["events", "patient_name"]
+    - ["events", "metatype"]
 
 user_params:
   url: "users/{user_id}/;view_json?keys=user_color" 
   type: json
   keys:
     - ["user", "user_color"]
+    - ["user", "archive_delay"]
+    - ["user", "user_statistics_group"]
+
+echeances:
+  url: "reglements/echeances/;view?expected_date=2020-01-01&expected_date=2030-07-10"
+  type: csv
+  keys:
+    - ["ID Patient"]
+    - ["Dû"]
+    - ["Date"]
+    - ["Acte"]

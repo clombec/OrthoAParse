@@ -1,6 +1,6 @@
 from functools import reduce
 from operator import getitem
-import datetime
+from datetime import datetime
 from . import OrthoAdl
 import logging
 import os
@@ -8,10 +8,10 @@ import csv
 import pandas as pd
 import json
 from bs4 import BeautifulSoup
-from datetime import datetime
 import re
 
 DEBUG_NO_DL_IN = False
+GET_ALL_USER_DATA = True
 
 class OrthoADataParse():
     def __init__(self, download_dir):
@@ -26,7 +26,7 @@ class OrthoADataParse():
         self.cleanUpSwitch = {
             "MetatypesFauteuils": self.cleanUpMetatypesFauteuils,
             "users": self.cleanUpUsers,
-            "alldays2026": self.cleanUpJt2026,
+            "alldaysyear": self.cleanUpJtYear,
             "jt": self.cleanUpJt,
         }
         self.typeCleanUpSwitch = {
@@ -142,7 +142,9 @@ class OrthoADataParse():
         if not keys:
             return datain
         # Navigate to the list itself (strip the last field segment)
-        list_path = keys[0][:-1] if len(keys[0]) > 1 else keys[0]
+        first = keys[0]
+        assert len(first) >= 1, f"[cleanUpJt] key path must not be empty, got {first}"
+        list_path = first[:-1] if len(first) > 1 else first
         _, items = self._get_by_path(datain, list_path)
         if not isinstance(items, list):
             return items
@@ -210,17 +212,6 @@ class OrthoADataParse():
                 date = item.get("Réglé le", "")
                 try:
                     amount = float(str(item.get("Montant", "0")).replace(",", ".").replace(" ", ""))
-                except ValueError:
-                    amount = 0.0
-                totals[date] = totals.get(date, 0.0) + amount
-            data = [{"date": date, "amount": round(montant, 2)} for date, montant in sorted(totals.items())]
-
-        if structure_name == "recettes_annuelles":
-            totals = {}
-            for item in data:
-                date = item.get("Réglé le", "")
-                try:
-                    amount = float(str(item.get("Montant", "0")).replace(",", "."))
                 except ValueError:
                     amount = 0.0
                 totals[date] = totals.get(date, 0.0) + amount
@@ -301,19 +292,19 @@ class OrthoADataParse():
                 "id": user_id,  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
             }
-            # Create out structure with the user ID and the full name "Prénom Nom"
-            # Add to this structure all params from the url user_params (from urls.yaml)
-            jt_json_url = self.urlsConfig.get("user_params", {}).get("url", "").format(user_id=user_id)
-            logging.info(f"[cleanUpUsers] Parsing user params for user {user_id}...")
-            try:
-                params = self.parseJson(jt_json_url, "user_params")  # This will download and parse the JSON for this user
-            except OrthoAdl.OrthoADownloadError as e:
-                # Log and skip this user — don't abort the whole multi fetch
-                logging.warning(f"[cleanUpUsers] Skipping user {user_id}: {e}")
-                continue
-            if params is not None:
-                udata.update(params)
-
+            if GET_ALL_USER_DATA:
+                # Create out structure with the user ID and the full name "Prénom Nom"
+                # Add to this structure all params from the url user_params (from urls.yaml)
+                jt_json_url = self.urlsConfig.get("user_params", {}).get("url", "").format(user_id=user_id)
+                logging.info(f"[cleanUpUsers] Parsing user params for user {user_id}...")
+                try:
+                    params = self.parseJson(jt_json_url, "user_params")  # This will download and parse the JSON for this user
+                except OrthoAdl.OrthoADownloadError as e:
+                    # Log and skip this user — don't abort the whole multi fetch
+                    logging.warning(f"[cleanUpUsers] Skipping user {user_id}: {e}")
+                    continue
+                if params is not None:
+                    udata.update(params)
             out_struct.append(udata)
         return out_struct
 
@@ -321,7 +312,7 @@ class OrthoADataParse():
     This clean up is specific to the JT2026 structure, which is an HTML table with a specific format. It extracts the relevant columns based on the keys defined in url.yaml for this structure, and returns a list of lists containing the cleaned data.
     It is base don a beautiful soup object, which is passed to the cleanUp function
     """
-    def cleanUpJt2026(self, soupin, structure_name):
+    def cleanUpJtYear(self, soupin, structure_name):
         out_struct = []
 
         # Get the html table with id "browse-list"
