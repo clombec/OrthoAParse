@@ -209,7 +209,7 @@ class OrthoADataParse():
                     continue
                 date = item.get("Réglé le", "")
                 try:
-                    amount = float(str(item.get("Montant", "0")).replace(",", "."))
+                    amount = float(str(item.get("Montant", "0")).replace(",", ".").replace(" ", ""))
                 except ValueError:
                     amount = 0.0
                 totals[date] = totals.get(date, 0.0) + amount
