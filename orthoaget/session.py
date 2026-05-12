@@ -99,6 +99,58 @@ class OrthoASession:
     def get_users_records(self):
         data = self.extract(["users"])
         return data['users']
+    
+    def get_stats_records(self) -> dict:
+        """
+        Build per-patient stats from rdvs_all and users.
+
+        Returns
+        -------
+        {str(patient_id): {
+            "rdvs": [{"date": "YYYY-MM-DD", "temps_praticien": int, "temps_total": int}, ...],
+            <user_params except name>   # user_statistics_group, archive_delay, ...
+        }}
+        Patients are identified by ID only — no name in output.
+        """
+        data = self.extract(["users", "rdvs_all", "MetatypesFauteuils"])
+
+        users     = data.get("users", [])
+        rdvs      = data.get("rdvs_all", [])
+        metatypes = data.get("MetatypesFauteuils", {}).get("metatypes", {})
+
+        # Plage planning value (e.g. "P55") -> {temps_praticien, temps_total}
+        plage_lookup = {
+            v["value"]: {"temps_praticien": v.get("dr", 0), "temps_total": v.get("duree", 0)}
+            for v in metatypes.values()
+        }
+
+        # Patient name (title-cased) -> id
+        name_to_id = {u["name"].strip().title(): u["id"] for u in users}
+
+        # Init result with user params — no id, no name
+        result = {
+            str(u["id"]): {k: v for k, v in u.items() if k not in ("id", "name")} | {"rdvs": []}
+            for u in users
+        }
+
+        for rdv in rdvs:
+            patient_name = rdv.get("Patient", "").strip().title()
+            patient_id = name_to_id.get(patient_name)
+            if patient_id is None:
+                continue
+
+            dt_str = rdv.get("Date et heure du RDV", "")
+            try:
+                date = datetime.strptime(dt_str, "%d/%m/%Y %Hh%M").date().isoformat()
+            except ValueError:
+                date = dt_str[:10]
+
+            plage = rdv.get("Plage planning", "")
+            times = plage_lookup.get(plage, {"temps_praticien": None, "temps_total": None})
+
+            result[str(patient_id)]["rdvs"].append({"date": date, "plage": plage, **times})
+
+        return result
 
     def get_calendar_records(self) -> dict:
         """
@@ -106,8 +158,8 @@ class OrthoASession:
         Returns a dict with keys: 'alldaysyear', 'jt', 'metatypes', 'rdvs_history'.
         Requires entries in urls.yaml for: jt, metatypes, alldaysyear, rdvs_history.
         """
-        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params = {"year": datetime.now().strftime("%y")})
-        days_next_year = self.extract(["alldaysyear"], params = {"year": str(int(datetime.now().strftime("%y"))+1)})
+        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params = {"year": datetime.now().strftime("%Y")})
+        days_next_year = self.extract(["alldaysyear"], params = {"year": str(int(datetime.now().strftime("%Y"))+1)})
         base["alldaysyear"].extend(days_next_year["alldaysyear"])
         ctx = build_context(base)
 

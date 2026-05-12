@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 import re
 
 DEBUG_NO_DL_IN = False
+GET_ALL_USER_DATA = True
 
 class OrthoADataParse():
     def __init__(self, download_dir):
@@ -291,19 +292,19 @@ class OrthoADataParse():
                 "id": user_id,  # Assuming the first key is the user ID
                 "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
             }
-            # Create out structure with the user ID and the full name "Prénom Nom"
-            # Add to this structure all params from the url user_params (from urls.yaml)
-            jt_json_url = self.urlsConfig.get("user_params", {}).get("url", "").format(user_id=user_id)
-            logging.info(f"[cleanUpUsers] Parsing user params for user {user_id}...")
-            try:
-                params = self.parseJson(jt_json_url, "user_params")  # This will download and parse the JSON for this user
-            except OrthoAdl.OrthoADownloadError as e:
-                # Log and skip this user — don't abort the whole multi fetch
-                logging.warning(f"[cleanUpUsers] Skipping user {user_id}: {e}")
-                continue
-            if params is not None:
-                udata.update(params)
-
+            if GET_ALL_USER_DATA:
+                # Create out structure with the user ID and the full name "Prénom Nom"
+                # Add to this structure all params from the url user_params (from urls.yaml)
+                jt_json_url = self.urlsConfig.get("user_params", {}).get("url", "").format(user_id=user_id)
+                logging.info(f"[cleanUpUsers] Parsing user params for user {user_id}...")
+                try:
+                    params = self.parseJson(jt_json_url, "user_params")  # This will download and parse the JSON for this user
+                except OrthoAdl.OrthoADownloadError as e:
+                    # Log and skip this user — don't abort the whole multi fetch
+                    logging.warning(f"[cleanUpUsers] Skipping user {user_id}: {e}")
+                    continue
+                if params is not None:
+                    udata.update(params)
             out_struct.append(udata)
         return out_struct
 

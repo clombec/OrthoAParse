@@ -91,12 +91,15 @@ daily_calendar: #{day} format: YYYY-MM-DD
     - ["events", "praticien_id"]
     - ["events", "fauteuil"]
     - ["events", "patient_name"]
+    - ["events", "metatype"]
 
 user_params:
   url: "users/{user_id}/;view_json?keys=user_color" 
   type: json
   keys:
     - ["user", "user_color"]
+    - ["user", "archive_delay"]
+    - ["user", "user_statistics_group"]
 
 echeances:
   url: "reglements/echeances/;view?expected_date=2020-01-01&expected_date=2030-07-10"

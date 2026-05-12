@@ -12,3 +12,4 @@ logs
 *.egg-info
 users_db.json
 toto.*
+mismatch.txt

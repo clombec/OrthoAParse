@@ -251,7 +251,8 @@ def transform_daily_events(daily_calendar: list, rdvs_history: list, ctx: dict) 
         if patient_id is not None:
             dt_key = _normalize_dt(ev.get("date", ""))
             if (patient_id, dt_key) not in rdvs_index:
-                logging.warning(f"[transform] Event not in rdvs_history: patient_id={patient_id}, date={dt_key}")
+                with open("mismatch.txt", "a") as f:
+                    f.write(f"Mismatch: patient_id={patient_id}, date={dt_key}\n")
 
         result.append({
             "date": ev.get("date"),
@@ -260,5 +261,6 @@ def transform_daily_events(daily_calendar: list, rdvs_history: list, ctx: dict) 
             "praticien_id": ev.get("praticien_id"),
             "fauteuil": fauteuil_map.get(str(ev.get("fauteuil", "")), ev.get("fauteuil")),
             "patient_id": patient_id,
+            "metatype": ev.get("metatype").replace("/listes/rdvs-metatypes/", "") if ev.get("metatype") else None,
         })
     return result
