@@ -210,10 +210,14 @@ class OrthoASession:
         user = self.get_user_by_id(user_id)
         return user.get("name") if user else None
 
-    def get_income_records(self, dayin = datetime.now().strftime("%Y-%m-%d"), dayout = datetime.now().strftime("%Y-%m-%d")) -> list:
+    def get_income_records(self, dayin = None, dayout = None) -> list:
         """
         Get income data for a specific date range. Default : today only
         """
+        if dayin is None:
+            dayin = datetime.now().strftime("%Y-%m-%d")
+        if dayout is None:
+            dayout = datetime.now().strftime("%Y-%m-%d")
         data = self.extract(["recette_jour"], params={"dayin": dayin, "dayout": dayout})
         return data["recette_jour"]
 
