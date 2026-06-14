@@ -28,7 +28,6 @@ class ProthDataManager:
     def __init__(self):
         self.full_data = []
         self.filtered_data = []
-        self.patientIds = []
         self.color_map = {}
         self.column_map = {}
         self.selected_actes = set()
@@ -37,6 +36,7 @@ class ProthDataManager:
         self.today_tx_filter_active = False
         self.today_rx_filter_active = False
         self.proth_filter = "Tous"
+        self.set_done = None  # callable(acte_urls) captured from session
 
     def load_data(self):
         """Load data from OrthoAData and configuration."""
@@ -51,17 +51,8 @@ class ProthDataManager:
 
         try:
             with OrthoASession() as session:
-                data = session.extract(["prothesiste", "users"])
-                self.full_data = data['prothesiste']
-                self.patientIds = data['users']
-
-                # Map patients to URLs
-                for line in self.full_data:
-                    patient_name = line.get("Patient", "")
-                    for id_entry in self.patientIds:
-                        if id_entry["name"].lower() == patient_name.lower():
-                            line["url"] = f"▶▶ Ouvrir dans OrthoAdvance {session.user_url(id_entry['id'])}"
-                            break
+                self.full_data = session.get_proth_records()
+                self.set_done = session.make_proth_set_done()
 
             logging.info(f"Data loaded. {len(self.full_data)} records found.")
             return True
@@ -204,6 +195,22 @@ def save_colors():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route("/set_actes_as_done", methods=["POST"])
+def route_set_actes_as_done():
+    """Mark one or more acts as done. Expects JSON body: {"urls": ["<full_acte_url>", ...]}"""
+    body = request.get_json(silent=True) or {}
+    acte_urls = body.get("urls", [])
+    if not acte_urls:
+        return jsonify({'success': False, 'error': 'No URLs provided'}), 400
+    if not data_manager.set_done:
+        return jsonify({'success': False, 'error': 'Session expirée, veuillez rafraîchir'}), 401
+    try:
+        data_manager.set_done(acte_urls)
+        return jsonify({'success': True})
+    except Exception as e:
+        logging.error(f"[set_actes_as_done] {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route("/refresh")
 def refresh():

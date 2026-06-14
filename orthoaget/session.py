@@ -8,19 +8,23 @@ Call end() when done to close the browser.
 
 Usage:
     session = OrthoASession()
-    proth = session.extract(["prothesiste"])
+    proth = session.get_proth_records()
     users = session.extract(["users"])
     url   = session.user_url(42)
     session.end()
 
 Or as a context manager:
     with OrthoASession() as session:
-        data = session.extract(["prothesiste", "users"])
+        records  = session.get_proth_records()
+        set_done = session.make_proth_set_done()
+    set_done([records[0]["url"]])
 """
 
 import json
+import requests
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from OrthoABase import DownloadDir
@@ -81,6 +85,8 @@ class OrthoASession:
                 data = self._parser.parseCsv(url, structure_name)
             elif data_type == "json":
                 data = self._parser.parseJson(url, structure_name)
+            elif data_type == "json_paginated":
+                data = self._parser.parseJsonPaginated(url, structure_name)
             elif data_type == "html":
                 data = self._parser.parseHtml(url, structure_name)
 
@@ -92,9 +98,72 @@ class OrthoASession:
 
         return parsed_data
     
-    def get_proth_records(self):
-        data = self.extract(["prothesiste"])
-        return data['prothesiste']
+    def get_proth_records(self) -> list:
+        """
+        Fetch all prothesiste acts via JsonProth (paginated JSON).
+        Each record contains all act fields plus:
+          'url'         : full acte URL  (for set_actes_as_done)
+          'patient_url' : full patient clinique URL
+        """
+        data = self.extract(["JsonProth"])
+        records = data.get("JsonProth", [])
+        base_url = self._parser.orthoAdl.OrthoAUrlBase
+        for rec in records:
+            rec["url"] = f"{base_url}{rec.get('abspath', '')}"
+            if rec.get("patient_url"):
+                rec["patient_url"] = f"{base_url}{rec['patient_url']}"
+        return records
+
+    def set_proth_actes_as_done(self, acte_urls: list[str]) -> bool:
+        """
+        Mark acts as done while the session (driver) is still open.
+        Grabs cookies from the live driver.
+        """
+        return self._post_set_done(
+            acte_urls,
+            self._parser.orthoAdl.driver.get_cookies(),
+            self._parser.orthoAdl.OrthoAUrlBase,
+        )
+
+    def make_proth_set_done(self):
+        """
+        Capture cookies now and return a callable(acte_urls) -> bool
+        that works after the session is closed.
+
+        Usage:
+            with OrthoASession() as session:
+                records  = session.get_proth_records()
+                set_done = session.make_proth_set_done()
+            set_done([records[0]["url"]])
+        """
+        cookies  = self._parser.orthoAdl.driver.get_cookies()
+        base_url = self._parser.orthoAdl.OrthoAUrlBase
+        return lambda acte_urls: self._post_set_done(acte_urls, cookies, base_url)
+
+    @staticmethod
+    def _post_set_done(acte_urls: list[str], cookies: list[dict], base_url: str) -> bool:
+        """POST /medical/prothesiste/planning with action=set_actes_as_done."""
+        paths = [urlparse(url).path for url in acte_urls if url]
+        if not paths:
+            raise ValueError("No valid act URLs provided")
+
+        req_session = requests.Session()
+        for cookie in cookies:
+            req_session.cookies.set(
+                cookie["name"], cookie["value"],
+                domain=cookie.get("domain"), path=cookie.get("path", "/"),
+            )
+
+        response = req_session.post(
+            f"{base_url}/medical/prothesiste/planning",
+            data=[("ids", p) for p in paths] + [("action", "set_actes_as_done")],
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            allow_redirects=True,
+            timeout=10,
+        )
+        if response.status_code in (200, 302):
+            return True
+        raise RuntimeError(f"set_actes_as_done failed: HTTP {response.status_code}")
 
     def get_users_records(self):
         data = self.extract(["users"])

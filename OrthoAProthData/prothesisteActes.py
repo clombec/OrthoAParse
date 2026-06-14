@@ -9,7 +9,6 @@ from orthoaget.session import OrthoASession
 from orthoaget.logger import setup_logger
 from tkinter import colorchooser
 import platform
-import webbrowser
 
 from orthoaget import PROJECT_ROOT
 
@@ -25,7 +24,8 @@ class App(ctk.CTk):
         self.title("Actes Prothésiste")
         self.geometry("900x500")
         self.after(0, lambda: self.wm_iconbitmap("OrthoAProthData/OrthoAProth.ico"))
-        self.click_str = "▶▶ Ouvrir dans OrthoAdvance "
+        self.mark_done_str = "✓ Marquer réalisé "
+        self.set_done = None  # callable(acte_urls) captured from session
 
         self.full_data = []
         self.filtered_data = []
@@ -118,7 +118,8 @@ class App(ctk.CTk):
 
         try:
             with OrthoASession() as session:
-                data = session.extract(["prothesiste", "users"])
+                self.full_data = session.get_proth_records()
+                self.set_done = session.make_proth_set_done()
         except OrthoAdl.OrthoAConnectionError as e:
             logging.error(f"Erreur de connexion : {e}")
             self.show_error(str(e))
@@ -132,16 +133,8 @@ class App(ctk.CTk):
             self.show_error(f"Erreur inattendue : {e}")
             return
 
-        self.full_data = data['prothesiste']
-        self.patientIds = data['users']
-
         for line in self.full_data:
-            patient_name = line.get("Patient", "")
-            # Map each patient in the act list to a URL from patient lookup table by case-insensitive name match
-            for id in self.patientIds:
-                if id["name"].lower() == patient_name.lower():
-                    line["url"] = f"{self.click_str}{id['url']}"
-                    break
+            line["url"] = f"{self.mark_done_str}{line['url']}"
 
         logging.info(f"Data loaded. {len(self.full_data)} records found.")
 
@@ -406,10 +399,9 @@ class App(ctk.CTk):
         col_name = self.tree["columns"][col_index]
 
         if col_name == "url":
-            value = self.tree.item(item)["values"][col_index].replace(self.click_str, "")
-
-            if value:
-                webbrowser.open(value)
+            acte_url = self.tree.item(item)["values"][col_index].replace(self.mark_done_str, "")
+            if acte_url:
+                self.markActeAsDone(acte_url)
 
     def setup_columns(self):
 
@@ -765,6 +757,20 @@ class App(ctk.CTk):
             key=lambda x: try_parse(x[col]),
             reverse=self.current_sort_reverse
         )
+
+    def markActeAsDone(self, acte_url: str) -> None:
+        """Mark a single act as done and show visual feedback."""
+        if not self.set_done:
+            tk.messagebox.showerror("Erreur", "Session expirée, veuillez rafraîchir.")
+            return
+        try:
+            self.set_done([acte_url])
+            logging.info(f"[markActeAsDone] OK: {acte_url}")
+            tk.messagebox.showinfo("Succès", "Acte marqué comme réalisé.")
+        except Exception as e:
+            logging.error(f"[markActeAsDone] Erreur: {e}")
+            tk.messagebox.showerror("Erreur", f"Impossible de marquer l'acte :\n{e}")
+
 
 def main():
     setup_logger()

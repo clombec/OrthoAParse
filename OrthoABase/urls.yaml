@@ -109,3 +109,7 @@ echeances:
     - ["Dû"]
     - ["Date"]
     - ["Acte"]
+
+JsonProth:
+  url: "medical/prothesiste/planning/;view?action=export_as_json"
+  type: json_paginated

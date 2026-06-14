@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 import re
 
 DEBUG_NO_DL_IN = False
-GET_ALL_USER_DATA = True
+GET_ALL_USER_DATA = False
 
 class OrthoADataParse():
     def __init__(self, download_dir):
@@ -28,6 +28,7 @@ class OrthoADataParse():
             "users": self.cleanUpUsers,
             "alldaysyear": self.cleanUpJtYear,
             "jt": self.cleanUpJt,
+            "JsonProth": self.cleanUpJsonProth,
         }
         self.typeCleanUpSwitch = {
             "csv": self.cleanUpCsv,
@@ -223,6 +224,85 @@ class OrthoADataParse():
     This clean up is specific to config structure, a JSON file with a specific format, including Metatypes description and Fauteuils list
     The data cannot be retrieved with a single list of keys or subkeys as they're nested and several configs are included, hence the parsing must be hardcoded
     """
+
+    _MONTHS_FR = {
+        "janvier": 1, "février": 2, "mars": 3, "avril": 4,
+        "mai": 5, "juin": 6, "juillet": 7, "août": 8,
+        "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
+    }
+
+    def _parseFrDatetime(self, label: str) -> str:
+        """Parse "Lundi 3 Juin 2024 à 11:25" -> isoformat, or "" if unparseable."""
+        m = re.search(r"(\d+)\s+(\w+)\s+(\d{4})\s+à\s+(\d{1,2}):(\d{2})", label, re.IGNORECASE)
+        if not m:
+            return ""
+        month = self._MONTHS_FR.get(m.group(2).lower())
+        if month is None:
+            return ""
+        return datetime(int(m.group(3)), month, int(m.group(1)),
+                        int(m.group(4)), int(m.group(5))).isoformat()
+
+    def cleanUpJsonProth(self, datain, structure_name):
+        """
+        Parse the JsonProth paginated JSON into a list of prothesiste records.
+        Column positions are derived from datain["columns"] — no hardcoded indices.
+        Each record mirrors the prothesiste CSV output and adds:
+          'abspath'     : act URL path (/medical/prothesiste/<hash>)
+          'patient_url' : clinique link for the patient
+        """
+        # Build col_name -> index from the columns descriptor
+        col_idx = {col["name"]: i for i, col in enumerate(datain.get("columns", []))}
+
+        def cell(row, name):
+            i = col_idx.get(name)
+            return row[i] if i is not None and i < len(row) else {}
+
+        result = []
+        for line in datain.get("lines", []):
+            rows = line.get("rows", [])
+
+            pe_raw = cell(rows, "pe").get("value", "")
+            try:
+                pe_iso = datetime.strptime(pe_raw, "%d/%m/%Y %Hh%M").isoformat() if pe_raw else ""
+            except ValueError:
+                pe_iso = ""
+
+            result.append({
+                "Prothésiste":          cell(rows, "prothesiste").get("value", ""),
+                "Patient":              cell(rows, "user_abspath").get("title", ""),
+                "Date du rdv":          self._parseFrDatetime(cell(rows, "acte_dtime").get("title", "")),
+                "Acte prothésiste":     cell(rows, "acte_prothesiste").get("title", ""),
+                "Date d'envoi au labo": cell(rows, "send_date").get("value", ""),
+                "Date de réception":    cell(rows, "receipt_date").get("value", ""),
+                "PE":                   pe_iso,
+                "Durée":                cell(rows, "duree").get("value", ""),
+                "Commentaires":         cell(rows, "comment").get("value", ""),
+                "abspath":              line.get("abspath", ""),
+                "patient_url":          cell(rows, "user_abspath").get("link", ""),
+            })
+        return result
+
+    def parseJsonPaginated(self, json_url: str, structure_name: str) -> list:
+        """Fetch all pages of a paginated JSON endpoint and return concatenated results."""
+        all_lines = []
+        columns = None
+        url = json_url
+        while url:
+            if not self.DEBUG_NO_DL:
+                self.orthoAdl.downloadPageText(url)
+            json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
+            if not os.path.exists(json_file):
+                break
+            with open(json_file, "r", encoding="utf-8") as f:
+                page_data = json.load(f)
+            if columns is None:
+                columns = page_data.get("columns", [])
+            all_lines.extend(page_data.get("lines", []))
+            next_url = page_data.get("pagination", {}).get("next", "")
+            url = next_url.replace(self.orthoAdl.OrthoAUrlBase, "").lstrip("/") if next_url else None
+            logging.info(f"[parseJsonPaginated] {len(all_lines)} records, next={url}")
+        return self.cleanUp({"columns": columns or [], "lines": all_lines}, structure_name)
+
     def cleanUpMetatypesFauteuils(self, datain, structure_name):
         journees = datain
 

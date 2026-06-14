@@ -8,7 +8,7 @@ Access on the local network at: http://<IP_DU_PC>:5000
 
 from flask import Flask, render_template, redirect, url_for
 import logging
-import OrthoABase.OrthoALogger as OrthoALogger
+import orthoaget.logger as OrthoALogger
 import OrthoARecettes.OrthoARecettes as OrthoARecettes
 
 app = Flask(__name__, template_folder="templates")
