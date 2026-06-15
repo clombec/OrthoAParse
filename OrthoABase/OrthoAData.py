@@ -265,6 +265,18 @@ class OrthoADataParse():
                 dt = datetime.strptime(item.pop("Date de réception"), "%d/%m/%Y").date()
                 item["Date de réception"] = dt.isoformat()
 
+        if structure_name == "echeances":
+            for item in data:
+                date_str = item.get("Date", "")
+                try:
+                    item["Date"] = datetime.strptime(date_str, "%d/%m/%Y").date().isoformat()
+                except ValueError:
+                    pass
+                try:
+                    item["Dû"] = float(str(item.get("Dû", "0")).replace(",", "."))
+                except ValueError:
+                    item["Dû"] = 0.0
+
         if structure_name == "recette_jour":
             totals = {}
             for item in data:

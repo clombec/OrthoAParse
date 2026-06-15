@@ -19,10 +19,10 @@ if __name__ == "__main__":
 #        with open("toto.json", "w", encoding="utf-8") as f:
 #            json.dump(data, f, ensure_ascii=False, indent=4)
 
-        # Test tri alphabétique des libellés photos
-        sorted_items = session.sort_html_table_items("PhotosLibelles")
-        print(f"{len(sorted_items)} libellés triés :")
-        for item in sorted_items:
-            print(f"  {item['title']}")
+        # Test échéances
+        echeances = session.get_echeances_records()
+        print(f"{len(echeances)} échéances récupérées")
+        total = sum(item.get("Dû", 0.0) for item in echeances)
+        print(f"Total dû : {round(total, 2)} €")
 
 #    main()
