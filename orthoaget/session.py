@@ -288,12 +288,16 @@ class OrthoASession:
         user = self.get_user_by_id(user_id)
         return user.get("name") if user else None
 
-    def get_echeances_records(self) -> list:
-        """Get payment schedule records from Jan 1st of the previous year to today."""
-        now = datetime.now()
-        date_start = datetime(now.year - 1, 1, 1).strftime("%Y-%m-%d")
-        date_end = now.strftime("%Y-%m-%d")
-        data = self.extract(["echeances"], params={"date_start": date_start, "date_end": date_end})
+    def get_echeances_records(self, dayin: str, dayout: str) -> list:
+        """
+        Get payment schedule records for the given date range.
+
+        Parameters
+        ----------
+        dayin  : start date, "YYYY-MM-DD"
+        dayout : end date,   "YYYY-MM-DD"
+        """
+        data = self.extract(["echeances"], params={"date_start": dayin, "date_end": dayout})
         return data["echeances"]
 
     def get_income_records(self, dayin = None, dayout = None) -> list:

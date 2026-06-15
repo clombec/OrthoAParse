@@ -20,7 +20,10 @@ if __name__ == "__main__":
 #            json.dump(data, f, ensure_ascii=False, indent=4)
 
         # Test échéances
-        echeances = session.get_echeances_records()
+        now = datetime.now()
+        dayin  = datetime(now.year - 2, 1, 1).strftime("%Y-%m-%d")
+        dayout = now.strftime("%Y-%m-%d")
+        echeances = session.get_echeances_records(dayin, dayout)
         print(f"{len(echeances)} échéances récupérées")
         total = sum(item.get("Dû", 0.0) for item in echeances)
         print(f"Total dû : {round(total, 2)} €")
