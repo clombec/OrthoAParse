@@ -5,6 +5,7 @@ from . import OrthoAdl
 import logging
 import os
 import csv
+import unicodedata
 import pandas as pd
 import json
 from bs4 import BeautifulSoup
@@ -93,6 +94,65 @@ class OrthoADataParse():
 
         return rows
 
+
+    def parseHtmlPaginated(self, html_url: str, structure_name: str) -> list:
+        """
+        Fetch all pages of a paginated HTML browse-list table and return
+        [{path, title}] for every row across all pages.
+
+        path  — from <input type="checkbox" name="ids" value="...">
+        title — from the column whose header contains "titre" (accent/case-insensitive)
+
+        Pagination is detected via <a class="next page-link" href="..."> links.
+        """
+        all_items = []
+        batch_start = 0
+        title_col_idx = None
+
+        while True:
+            url = f"{html_url}?batch_start={batch_start}"
+            htmlpage = "page_content.html"
+            if not self.DEBUG_NO_DL:
+                self.orthoAdl.downloadPageHtml(url, htmlpage)
+            html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
+            if not os.path.exists(html_file):
+                break
+            with open(html_file, "r", encoding="utf-8") as f:
+                soup = BeautifulSoup(f.read(), "html.parser")
+
+            table = soup.find("table", id="browse-list")
+            if not table or not table.tbody:
+                break
+
+            if title_col_idx is None:
+                headers = [th.get_text(strip=True) for th in table.thead.find_all("th")]
+                title_col_idx = next(
+                    (i for i, h in enumerate(headers)
+                     if "titre" in unicodedata.normalize("NFD", h).encode("ascii", "ignore").decode().casefold()),
+                    None,
+                )
+                if title_col_idx is None:
+                    raise ValueError(f"[{structure_name}] No 'titre' column in headers: {headers}")
+
+            for row in table.tbody.find_all("tr"):
+                checkbox = row.find("input", {"type": "checkbox", "name": "ids"})
+                if not checkbox:
+                    continue
+                path = checkbox.get("value", "")
+                tds = row.find_all("td")
+                if title_col_idx >= len(tds):
+                    continue
+                link = tds[title_col_idx].find("a")
+                title = link.get_text(strip=True) if link else tds[title_col_idx].get_text(strip=True)
+                if path and title:
+                    all_items.append({"path": path, "title": title})
+
+            next_link = soup.find("a", class_="next page-link")
+            if not next_link or not next_link.get("href"):
+                break
+            batch_start += 50
+
+        return all_items
 
     def _cfg(self, structure_name):
         cfg = self.urlsConfig.get(structure_name, {})

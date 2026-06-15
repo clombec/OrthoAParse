@@ -113,3 +113,8 @@ echeances:
 JsonProth:
   url: "medical/prothesiste/planning/;view?action=export_as_json"
   type: json_paginated
+
+PhotosLibelles:
+  url: "medical/photos/libelles"
+  type: html_paginated
+  

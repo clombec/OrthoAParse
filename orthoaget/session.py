@@ -21,6 +21,7 @@ Or as a context manager:
 """
 
 import json
+import unicodedata
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,12 @@ from orthoaget.transform import build_context, get_open_days, transform_daily_ev
 
 URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
 USERS_DB_FILE = Path(PROJECT_ROOT) / "users_db.json"
+
+
+def _normalize_str(s: str) -> str:
+    """Lowercase, strip accents — used for case/accent-insensitive comparisons and sorting."""
+    nfd = unicodedata.normalize("NFD", s)
+    return "".join(c for c in nfd if unicodedata.category(c) != "Mn").casefold()
 
 class OrthoASession:
     def __init__(self, urls_file: str = URLS_FILE):
@@ -89,6 +96,8 @@ class OrthoASession:
                 data = self._parser.parseJsonPaginated(url, structure_name)
             elif data_type == "html":
                 data = self._parser.parseHtml(url, structure_name)
+            elif data_type == "html_paginated":
+                data = self._parser.parseHtmlPaginated(url, structure_name)
 
             if not DEBUG_NO_DL_IN:
                 DownloadDir.clearDownloadDir(self._download_dir)
@@ -293,6 +302,55 @@ class OrthoASession:
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""
         return f"{self._parser.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user_id}/clinique/compact/"
+
+    def get_html_table_items(self, url_name: str) -> list[dict]:
+        """
+        Return [{path, title}] for all rows of a paginated HTML browse-list table.
+        url_name must be a key in urls.yaml with type "html_paginated".
+        """
+        return self.extract([url_name])[url_name]
+
+    def sort_html_table_items(self, url_name: str) -> list[dict]:
+        """
+        Sort all items of a paginated HTML table alphabetically by title
+        (case/accent-insensitive). Reorders by POSTing order_top in reverse
+        alphabetical order so the first item ends at position 1.
+
+        Returns the sorted list [{path, title}].
+        """
+        items = self.get_html_table_items(url_name)
+        sorted_items = sorted(items, key=lambda x: _normalize_str(x["title"]))
+
+        base_url_path = self._all_urls[url_name]["url"].split("?")[0]
+        cookies = self._parser.orthoAdl.driver.get_cookies()
+        base_url = self._parser.orthoAdl.OrthoAUrlBase
+        for item in reversed(sorted_items):
+            self._post_table_reorder(item["path"], "order_top", cookies, base_url, base_url_path)
+
+        return sorted_items
+
+    @staticmethod
+    def _post_table_reorder(
+        path: str, action: str, cookies: list[dict], base_url: str, url_path: str
+    ) -> None:
+        """POST <url_path> with ids=<path>&action=<action>."""
+        req_session = requests.Session()
+        for cookie in cookies:
+            req_session.cookies.set(
+                cookie["name"], cookie["value"],
+                domain=cookie.get("domain"), path=cookie.get("path", "/"),
+            )
+        response = req_session.post(
+            f"{base_url}/{url_path}",
+            data={"ids": path, "action": action},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            allow_redirects=True,
+            timeout=10,
+        )
+        if response.status_code not in (200, 302):
+            raise RuntimeError(
+                f"Table reorder failed for {path} (action={action}): HTTP {response.status_code}"
+            )
 
     def end(self):
         """Close the browser session."""
