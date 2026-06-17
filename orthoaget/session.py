@@ -372,4 +372,8 @@ class OrthoASession:
         return self
 
     def __exit__(self, *_):
-        self.end()
+        try:
+            self.end()
+        except Exception:
+            print("OrthoASession: error during cleanup", exc_info=True)
+
