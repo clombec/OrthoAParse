@@ -121,17 +121,6 @@ class OrthoASession:
             rec["url"] = f"{base_url}{rec.get('abspath', '')}"
             if rec.get("patient_url"):
                 rec["patient_url"] = f"{base_url}{rec['patient_url']}"
-        DATE_FIELDS = ["Date d'envoi au labo", "Date de réception", "PE", "Date du rdv"]
-        for rec in records:
-            for field in DATE_FIELDS:
-                val = rec.get(field)
-                if not val:
-                    rec[field] = None
-                else:
-                    try:
-                        rec[field] = datetime.strptime(val, "%d/%m/%Y").date()
-                    except ValueError:
-                        rec[field] = None
         return records
 
     def set_proth_actes_as_done(self, acte_urls: list[str]) -> bool:

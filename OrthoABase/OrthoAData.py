@@ -334,18 +334,28 @@ class OrthoADataParse():
             rows = line.get("rows", [])
 
             pe_raw = cell(rows, "pe").get("value", "")
+            de_raw = cell(rows, "send_date").get("value", "")
+            dr_raw = cell(rows, "receipt_date").get("value", "")
             try:
-                pe_iso = datetime.strptime(pe_raw, "%d/%m/%Y %Hh%M").isoformat() if pe_raw else ""
+                pe_iso = datetime.strptime(pe_raw, "%d/%m/%Y %Hh%M").isoformat() if pe_raw else None
             except ValueError:
-                pe_iso = ""
+                pe_iso = None
+            try:
+                de_iso = datetime.strptime(de_raw, "%d/%m/%Y").date()
+            except ValueError:
+                de_iso = None
+            try:
+                dr_iso = datetime.strptime(dr_raw, "%d/%m/%Y").date()
+            except ValueError:
+                dr_iso = None
 
             result.append({
                 "Prothésiste":          cell(rows, "prothesiste").get("value", ""),
                 "Patient":              cell(rows, "user_abspath").get("title", ""),
                 "Date du rdv":          self._parseFrDatetime(cell(rows, "acte_dtime").get("title", "")),
                 "Acte prothésiste":     cell(rows, "acte_prothesiste").get("title", ""),
-                "Date d'envoi au labo": cell(rows, "send_date").get("value", ""),
-                "Date de réception":    cell(rows, "receipt_date").get("value", ""),
+                "Date d'envoi au labo": de_iso,
+                "Date de réception":    dr_iso,
                 "PE":                   pe_iso,
                 "Durée":                cell(rows, "duree").get("value", ""),
                 "Commentaires":         cell(rows, "comment").get("value", ""),
