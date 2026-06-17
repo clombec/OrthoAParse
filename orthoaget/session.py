@@ -124,11 +124,14 @@ class OrthoASession:
         DATE_FIELDS = ["Date d'envoi au labo", "Date de réception", "PE", "Date du rdv"]
         for rec in records:
             for field in DATE_FIELDS:
-                if rec.get(field):
+                val = rec.get(field)
+                if not val:
+                    rec[field] = None
+                else:
                     try:
-                        rec[field] = datetime.strptime(rec[field], "%d/%m/%Y").date()
+                        rec[field] = datetime.strptime(val, "%d/%m/%Y").date()
                     except ValueError:
-                        pass
+                        rec[field] = None
         return records
 
     def set_proth_actes_as_done(self, acte_urls: list[str]) -> bool:
