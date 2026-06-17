@@ -249,11 +249,12 @@ class OrthoAdl():
                 f"Échec du téléchargement HTML ({pageUrl}) : {e}"
             ) from e
 
-    def downloadPageText(self, pageUrl, filename="page_content.txt"):
+    def downloadPageText(self, pageUrl, filename="page_content.txt", fullUrl=False):
         # Access the page and download text content
         driver = self.driver
-        logging.info(f"Accessing page: {self.OrthoAUrlBase}/{pageUrl}")
-        driver.get(f"{self.OrthoAUrlBase}/{pageUrl}")
+        url = pageUrl if fullUrl else f"{self.OrthoAUrlBase}/{pageUrl}"
+        logging.info(f"Accessing page: {url}")
+        driver.get(url)
 
         try:
             # Wait for page to load
@@ -273,7 +274,7 @@ class OrthoAdl():
 
         except Exception as e:
             raise OrthoADownloadError(
-                f"Échec du téléchargement texte ({pageUrl}) : {e}"
+                f"Échec du téléchargement texte ({url}) : {e}"
             ) from e
 
     def end(self):

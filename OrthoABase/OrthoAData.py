@@ -358,10 +358,10 @@ class OrthoADataParse():
         """Fetch all pages of a paginated JSON endpoint and return concatenated results."""
         all_lines = []
         columns = None
-        url = json_url
+        url = f"{self.orthoAdl.OrthoAUrlBase}/{json_url}"
         while url:
             if not self.DEBUG_NO_DL:
-                self.orthoAdl.downloadPageText(url)
+                self.orthoAdl.downloadPageText(url, fullUrl=True)
             json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
             if not os.path.exists(json_file):
                 break
@@ -370,8 +370,7 @@ class OrthoADataParse():
             if columns is None:
                 columns = page_data.get("columns", [])
             all_lines.extend(page_data.get("lines", []))
-            next_url = page_data.get("pagination", {}).get("next", "")
-            url = next_url.replace(self.orthoAdl.OrthoAUrlBase, "").lstrip("/") if next_url else None
+            url = page_data.get("pagination", {}).get("next", "")
             logging.info(f"[parseJsonPaginated] {len(all_lines)} records, next={url}")
         return self.cleanUp({"columns": columns or [], "lines": all_lines}, structure_name)
 
