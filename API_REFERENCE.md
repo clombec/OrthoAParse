@@ -47,7 +47,7 @@ Fetches all prosthetist acts (pagination handled automatically).
 | `PE` | str ISO \| `""` | PE date (empty if absent) |
 | `Durée` | str | Duration |
 | `Commentaires` | str | Free-text comments |
-| `url` | str | Full act URL (used by `set_proth_actes_as_done`) |
+| `url` | str | Full act URL (used by `fetch_act` / `confirm_act_done`) |
 | `patient_url` | str | Patient clinical URL |
 
 ---
@@ -199,30 +199,62 @@ Returns all rows of a paginated HTML browse-list table defined in `urls.yaml`.
 
 ## Write methods
 
-### `set_proth_actes_as_done(acte_urls: list[str]) → bool`
+The two-step flow — fetch then confirm — separates reading from writing so the user can validate before any change is committed.
 
-Marks prosthetist acts as done **while the session is still open**.
+```python
+# Step 1 — inside the session (Chrome open)
+with OrthoASession() as session:
+    records = session.get_proth_records()
+    cookies = session.get_cookies()
 
-**Parameter** — `acte_urls`: list of full URLs (the `url` field from `get_proth_records`).  
-**Returns** — `True` on success.  
-**Raises** — `RuntimeError` if the POST fails.
+# Step 2 — Chrome closed; one act at a time
+form_data, is_expired = OrthoASession.fetch_act(records[0]["url"], cookies)
+if is_expired:
+    # re-open a new OrthoASession to get fresh cookies
+    ...
+else:
+    # show form_data to the user, then on confirm:
+    OrthoASession.confirm_act_done(records[0]["url"], cookies, form_data)
+```
 
 ---
 
-### `make_proth_set_done() → callable`
+### `get_cookies() → list[dict]`
 
-Captures the current session cookies and returns a callable that works **after** the browser is closed.
+Returns the current Chrome session cookies. **Must be called before `end()` / exiting the `with` block.**
 
-**Returns** — `callable(acte_urls: list[str]) -> bool`
+Store the result and pass it to `fetch_act` and `confirm_act_done`.
 
-```python
-with OrthoASession() as session:
-    records  = session.get_proth_records()
-    set_done = session.make_proth_set_done()
+---
 
-# Session is closed here, but set_done remains valid
-set_done([records[0]["url"]])
-```
+### `fetch_act(url: str, cookies: list[dict]) → tuple[dict | None, dict | None, bool]` *(static)*
+
+GETs a single act page using existing cookies and parses its form fields.
+
+**Parameters**:
+- `url`: full act URL (the `url` field from `get_proth_records`)
+- `cookies`: list from `get_cookies()`
+
+**Returns** — `(form_data, form_display, is_expired)`:
+- `form_data`: raw dict `{name: value}` for passing to `confirm_act_done` — select fields contain the path value (e.g. `/medical/prothesiste/actes/36`)
+- `form_display`: same structure but select fields contain the human-readable label (e.g. `Analyse empreinte go max`) — use this for display only
+- `is_expired`: `True` if cookies have expired (session redirect detected) — open a new `OrthoASession` to get fresh cookies and retry; both dicts are `None` in that case
+
+**Raises** — `RuntimeError` if the GET fails or no form is found.
+
+---
+
+### `confirm_act_done(url: str, cookies: list[dict], form_data: dict) → bool` *(static)*
+
+POSTs the act form with `done=1` to mark it as realised.
+
+**Parameters**:
+- `url`: same URL passed to `fetch_act`
+- `cookies`: list from `get_cookies()`
+- `form_data`: dict returned by `fetch_act`
+
+**Returns** — `True` on success.  
+**Raises** — `RuntimeError` if the POST fails.
 
 ---
 
@@ -267,7 +299,7 @@ Prefer the domain-specific methods above; use `extract` only to access entries n
 | `OrthoAdl.OrthoAConnectionError` | `__init__` | Login / connection failure |
 | `OrthoAdl.OrthoADownloadError` | any extract method | Page download failure |
 | `KeyError` | `extract()` | Unknown entry in `urls.yaml` |
-| `RuntimeError` | `set_proth_actes_as_done`, `sort_html_table_items` | Unexpected HTTP response |
+| `RuntimeError` | `fetch_act`, `confirm_act_done`, `sort_html_table_items` | Unexpected HTTP response |
 
 ```python
 import OrthoABase.OrthoAdl as OrthoAdl

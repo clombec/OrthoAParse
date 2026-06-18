@@ -29,15 +29,32 @@ if __name__ == "__main__":
 #        print(f"Total dû : {round(total, 2)} €")
 
         records = session.get_proth_records()
-        set_done = session.make_proth_set_done()
+        cookies = session.get_cookies()
 
+    # Chrome fermé — test du flow à deux étapes
     actes_lucas = [r for r in records if r.get("Patient", "").strip().lower() == "lucas test"]
     if not actes_lucas:
         print("Aucun acte trouvé pour Lucas Test.")
     else:
         acte = actes_lucas[0]
-        print(f"Acte trouvé : {acte.get('Acte prothésiste')} — {acte.get('Date du rdv')} — {acte.get('url')}")
-        set_done([acte["url"]])
-        print("Acte marqué comme réalisé.")
+        url = acte["url"]
+        print(f"Acte trouvé : {acte.get('Acte prothésiste')} — {acte.get('Date du rdv')} — {url}")
+
+        # Étape 1 : fetch (GET + parse)
+        form_data, form_display, is_expired = OrthoASession.fetch_act(url, cookies)
+        if is_expired:
+            print("Cookies expirés — relancer une session.")
+        else:
+            print(f"Champs de l'acte ({len(form_display)} champs) :")
+            for k, v in form_display.items():
+                print(f"  {k} = {v!r}")
+
+            # Étape 2 : confirmation avant POST
+            confirm = input("\nMarquer comme réalisé ? (o/N) : ").strip().lower()
+            if confirm == "o":
+                OrthoASession.confirm_act_done(url, cookies, form_data)
+                print("Acte marqué comme réalisé.")
+            else:
+                print("Annulé.")
 
 #    main()
