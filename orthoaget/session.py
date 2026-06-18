@@ -186,6 +186,10 @@ class OrthoASession:
             if name:
                 form_data[name] = form_display[name] = tag.get_text()
 
+        patient_tag = soup.select_one("div.well ul.list-unstyled li a")
+        if patient_tag:
+            form_display["patient"] = patient_tag.get_text(strip=True)
+
         return form_data, form_display, False
 
     @staticmethod
