@@ -28,6 +28,16 @@ if __name__ == "__main__":
 #        total = sum(item.get("Dû", 0.0) for item in echeances)
 #        print(f"Total dû : {round(total, 2)} €")
 
-        data = session.get_proth_records()
+        records = session.get_proth_records()
+        set_done = session.make_proth_set_done()
+
+    actes_lucas = [r for r in records if r.get("Patient", "").strip().lower() == "lucas test"]
+    if not actes_lucas:
+        print("Aucun acte trouvé pour Lucas Test.")
+    else:
+        acte = actes_lucas[0]
+        print(f"Acte trouvé : {acte.get('Acte prothésiste')} — {acte.get('Date du rdv')} — {acte.get('url')}")
+        set_done([acte["url"]])
+        print("Acte marqué comme réalisé.")
 
 #    main()

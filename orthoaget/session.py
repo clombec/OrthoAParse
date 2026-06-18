@@ -25,7 +25,6 @@ import unicodedata
 import requests
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
 
 import yaml
 from OrthoABase import DownloadDir
@@ -128,11 +127,10 @@ class OrthoASession:
         Mark acts as done while the session (driver) is still open.
         Grabs cookies from the live driver.
         """
-        return self._post_set_done(
-            acte_urls,
-            self._parser.orthoAdl.driver.get_cookies(),
-            self._parser.orthoAdl.OrthoAUrlBase,
-        )
+        cookies = self._parser.orthoAdl.driver.get_cookies()
+        for url in acte_urls:
+            self._post_set_done_via_abspath(url, cookies)
+        return True
 
     def make_proth_set_done(self):
         """
@@ -145,16 +143,19 @@ class OrthoASession:
                 set_done = session.make_proth_set_done()
             set_done([records[0]["url"]])
         """
-        cookies  = self._parser.orthoAdl.driver.get_cookies()
-        base_url = self._parser.orthoAdl.OrthoAUrlBase
-        return lambda acte_urls: self._post_set_done(acte_urls, cookies, base_url)
+        cookies = self._parser.orthoAdl.driver.get_cookies()
+
+        def set_done(acte_urls: list[str]) -> bool:
+            for url in acte_urls:
+                self._post_set_done_via_abspath(url, cookies)
+            return True
+
+        return set_done
 
     @staticmethod
-    def _post_set_done(acte_urls: list[str], cookies: list[dict], base_url: str) -> bool:
-        """POST /medical/prothesiste/planning with action=set_actes_as_done."""
-        paths = [urlparse(url).path for url in acte_urls if url]
-        if not paths:
-            raise ValueError("No valid act URLs provided")
+    def _post_set_done_via_abspath(acte_url: str, cookies: list[dict]) -> bool:
+        """GET the act page, parse the form, POST back with done=1."""
+        from bs4 import BeautifulSoup
 
         req_session = requests.Session()
         for cookie in cookies:
@@ -163,16 +164,67 @@ class OrthoASession:
                 domain=cookie.get("domain"), path=cookie.get("path", "/"),
             )
 
-        response = req_session.post(
-            f"{base_url}/medical/prothesiste/planning",
-            data=[("ids", p) for p in paths] + [("action", "set_actes_as_done")],
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        get_resp = req_session.get(acte_url, timeout=10, allow_redirects=True)
+        if get_resp.status_code != 200:
+            raise RuntimeError(f"GET {acte_url} failed: HTTP {get_resp.status_code}")
+        if get_resp.url.rstrip("/") != acte_url.rstrip("/"):
+            raise RuntimeError(f"Session expirée : redirigé vers {get_resp.url}")
+
+        soup = BeautifulSoup(get_resp.text, "html.parser")
+        forms = soup.find_all("form")
+        form = next(
+            (f for f in forms if str(f.get("method", "")).lower() == "post"),
+            forms[0] if forms else None,
+        )
+        if not form:
+            raise RuntimeError(f"No form found at {acte_url}")
+
+        form_data = {}
+
+        for tag in form.find_all("input"):
+            name = tag.get("name")
+            if not name:
+                continue
+            input_type = str(tag.get("type", "text")).lower()
+            if input_type in ("checkbox", "radio"):
+                if tag.has_attr("checked"):
+                    form_data[name] = tag.get("value", "on")
+            elif input_type != "submit":
+                form_data[name] = tag.get("value", "")
+
+        for tag in form.find_all("select"):
+            name = tag.get("name")
+            if not name:
+                continue
+            selected = tag.find("option", selected=True)
+            if selected:
+                form_data[name] = selected.get("value", "")
+            else:
+                first = tag.find("option")
+                form_data[name] = first.get("value", "") if first else ""
+
+        for tag in form.find_all("textarea"):
+            name = tag.get("name")
+            if name:
+                form_data[name] = tag.get_text()
+
+        form_data["done"] = "1"
+
+        cookie_header = "; ".join(
+            f"{c['name']}={c['value']}" for c in cookies
+        ).replace('"', '\\"')
+        data_args = " ".join(f'-F "{k}={v}"' for k, v in form_data.items())
+        print(f'curl -X POST "{acte_url}" -H "Cookie: {cookie_header}" {data_args} -L')
+
+        post_resp = req_session.post(
+            acte_url,
+            data=form_data,
             allow_redirects=True,
             timeout=10,
         )
-        if response.status_code in (200, 302):
+        if post_resp.status_code in (200, 302):
             return True
-        raise RuntimeError(f"set_actes_as_done failed: HTTP {response.status_code}")
+        raise RuntimeError(f"POST to {acte_url} failed: HTTP {post_resp.status_code}")
 
     def get_users_records(self):
         data = self.extract(["users"])
