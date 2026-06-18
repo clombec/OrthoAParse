@@ -26,6 +26,7 @@ import unicodedata
 import requests
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from OrthoABase import DownloadDir
@@ -148,7 +149,7 @@ class OrthoASession:
         resp = req_session.get(url, timeout=10, allow_redirects=True)
         if resp.status_code != 200:
             raise RuntimeError(f"GET {url} failed: HTTP {resp.status_code}")
-        if resp.url.rstrip("/") != url.rstrip("/"):
+        if urlparse(resp.url).path.rstrip("/") != urlparse(url).path.rstrip("/"):
             return None, None, True
 
         soup = BeautifulSoup(resp.text, "html.parser")
