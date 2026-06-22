@@ -191,7 +191,16 @@ class OrthoADataParse():
             return {f: obj.get(f) for f in fields}
 
         # Multiple prefixes: flat dict, each path resolved independently
-        return {path[-1]: reduce(getitem, path, datain) for path in keys}
+        def _safe_get(path, obj):
+            for key in path:
+                if isinstance(obj, list):
+                    obj = obj[0] if obj else None
+                if not isinstance(obj, dict):
+                    return None
+                obj = obj.get(key)
+            return obj
+
+        return {path[-1]: _safe_get(path, datain) for path in keys}
 
     """
         This clean up is specific to the JT structure :
@@ -244,33 +253,41 @@ class OrthoADataParse():
 
         if structure_name == "rdvs_history":
             for item in data:
-                dt = datetime.strptime(
-                    item.pop("Date et heure du RDV"),
-                    "%d/%m/%Y %Hh%M"
-                )
-                item["Date et heure du RDV"] = dt.isoformat()
+                raw = item.pop("Date et heure du RDV", "")
+                try:
+                    item["Date et heure du RDV"] = datetime.strptime(raw, "%d/%m/%Y %Hh%M").isoformat()
+                except (ValueError, TypeError):
+                    item["Date et heure du RDV"] = raw or ""
 
         if structure_name == "prothesiste":
             for item in data:
-                dt = datetime.fromisoformat(item.pop("Date du rdv"))
-                item["Date du rdv"] = dt.isoformat()
-                pe_date_str = item.pop("PE", "")
-                if pe_date_str == "":
+                raw_rdv = item.pop("Date du rdv", "")
+                try:
+                    item["Date du rdv"] = datetime.fromisoformat(raw_rdv).isoformat()
+                except (ValueError, TypeError):
+                    item["Date du rdv"] = raw_rdv or ""
+                pe_date_str = item.pop("PE", "") or ""
+                try:
+                    item["PE"] = datetime.fromisoformat(pe_date_str).isoformat() if pe_date_str else None
+                except (ValueError, TypeError):
                     item["PE"] = None
-                else:
-                    dt = datetime.fromisoformat(pe_date_str)
-                    item["PE"] = dt.isoformat()
-                dt = datetime.strptime(item.pop("Date d'envoi au labo"), "%d/%m/%Y").date()
-                item["Date d'envoi au labo"] = dt.isoformat()
-                dt = datetime.strptime(item.pop("Date de réception"), "%d/%m/%Y").date()
-                item["Date de réception"] = dt.isoformat()
+                raw_envoi = item.pop("Date d'envoi au labo", "") or ""
+                try:
+                    item["Date d'envoi au labo"] = datetime.strptime(raw_envoi, "%d/%m/%Y").date().isoformat()
+                except (ValueError, TypeError):
+                    item["Date d'envoi au labo"] = raw_envoi
+                raw_reception = item.pop("Date de réception", "") or ""
+                try:
+                    item["Date de réception"] = datetime.strptime(raw_reception, "%d/%m/%Y").date().isoformat()
+                except (ValueError, TypeError):
+                    item["Date de réception"] = raw_reception
 
         if structure_name == "echeances":
             for item in data:
                 date_str = item.get("Date", "")
                 try:
                     item["Date"] = datetime.strptime(date_str, "%d/%m/%Y").date().isoformat()
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
                 try:
                     item["Dû"] = float(str(item.get("Dû", "0")).replace(",", "."))
@@ -305,6 +322,8 @@ class OrthoADataParse():
 
     def _parseFrDatetime(self, label: str) -> str:
         """Parse "Lundi 3 Juin 2024 à 11:25" -> isoformat, or "" if unparseable."""
+        if not label or not isinstance(label, str):
+            return ""
         m = re.search(r"(\d+)\s+(\w+)\s+(\d{4})\s+à\s+(\d{1,2}):(\d{2})", label, re.IGNORECASE)
         if not m:
             return ""
@@ -338,15 +357,15 @@ class OrthoADataParse():
             dr_raw = cell(rows, "receipt_date").get("value", "")
             try:
                 pe_iso = datetime.strptime(pe_raw, "%d/%m/%Y %Hh%M").isoformat() if pe_raw else None
-            except ValueError:
+            except (ValueError, TypeError):
                 pe_iso = None
             try:
-                de_iso = datetime.strptime(de_raw, "%d/%m/%Y").date()
-            except ValueError:
+                de_iso = datetime.strptime(de_raw, "%d/%m/%Y").date() if de_raw else None
+            except (ValueError, TypeError):
                 de_iso = None
             try:
-                dr_iso = datetime.strptime(dr_raw, "%d/%m/%Y").date()
-            except ValueError:
+                dr_iso = datetime.strptime(dr_raw, "%d/%m/%Y").date() if dr_raw else None
+            except (ValueError, TypeError):
                 dr_iso = None
 
             result.append({
