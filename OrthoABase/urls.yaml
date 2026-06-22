@@ -102,7 +102,7 @@ user_params:
     - ["user", "user_statistics_group"]
 
 echeances:
-  url: "reglements/echeances/;view?expected_date={date_start}&expected_date={date_end}"
+  url: "reglements/echeances/;view?expected_date={dayin}&expected_date={dayout}"
   type: csv
   keys:
     - ["ID Patient"]

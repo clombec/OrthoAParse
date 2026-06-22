@@ -152,7 +152,8 @@ Fetches the full planning configuration (current year + next year) and all daily
 
 ### `get_echeances_records(dayin: str, dayout: str) → list[dict]`
 
-Fetches payment schedule records for the given date range.
+Fetches payment schedule records for the given date range.  
+Patient names are anonymized: `"ID Patient"` is replaced by the numeric OrthoAdvance ID (looked up from the local cache).
 
 **Parameters**:
 - `dayin`: `str` `"YYYY-MM-DD"` — start date
@@ -162,9 +163,10 @@ Fetches payment schedule records for the given date range.
 
 | Key | Type | Description |
 |-----|------|-------------|
+| `ID Patient` | int \| str | Numeric patient ID (or original name if not found in cache) |
 | `Date` | str ISO | Due date |
 | `Dû` | float | Amount due |
-| *(other CSV columns)* | — | As exported by OrthoAdvance |
+| `Acte` | str | Act label |
 
 ---
 

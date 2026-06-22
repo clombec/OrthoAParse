@@ -22,7 +22,6 @@ Or as a context manager:
 """
 
 import json
-import unicodedata
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -32,16 +31,12 @@ import yaml
 from OrthoABase import DownloadDir
 from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN
 from orthoaget import PROJECT_ROOT
-from orthoaget.transform import build_context, get_open_days, transform_daily_events, transform_jt
+from orthoaget.transform import build_context, build_name_map, get_open_days, transform_daily_events, transform_jt, normalize_name
 
 URLS_FILE = f"{PROJECT_ROOT}/OrthoABase/urls.yaml"
 USERS_DB_FILE = Path(PROJECT_ROOT) / "users_db.json"
 
 
-def _normalize_str(s: str) -> str:
-    """Lowercase, strip accents — used for case/accent-insensitive comparisons and sorting."""
-    nfd = unicodedata.normalize("NFD", s)
-    return "".join(c for c in nfd if unicodedata.category(c) != "Mn").casefold()
 
 class OrthoASession:
     def __init__(self, urls_file: str = URLS_FILE):
@@ -252,17 +247,16 @@ class OrthoASession:
             for v in metatypes.values()
         }
 
-        # Patient name (title-cased) -> id
-        name_to_id = {u["name"].strip().title(): u["id"] for u in users}
+        name_to_id, _ = build_name_map(users)
 
-        # Init result with user params — no id, no name
+        # Init result with user params — no id, no name fields
         result = {
-            str(u["id"]): {k: v for k, v in u.items() if k not in ("id", "name")} | {"rdvs": []}
+            str(u["id"]): {k: v for k, v in u.items() if k not in ("id", "last_name", "first_name")} | {"rdvs": []}
             for u in users
         }
 
         for rdv in rdvs:
-            patient_name = rdv.get("Patient", "").strip().title()
+            patient_name = normalize_name(rdv.get("Patient", "").strip())
             patient_id = name_to_id.get(patient_name)
             if patient_id is None:
                 continue
@@ -304,6 +298,7 @@ class OrthoASession:
             "jt": jt_tables,
             "events": all_events,
             "alldaysyear": open_days,
+            "metatype_map": ctx["metatype_map"],
         }
         return data
 
@@ -334,21 +329,57 @@ class OrthoASession:
         return db.get(key)
 
     def get_name_by_id(self, user_id: int) -> str | None:
-        """Return the name for a given user id."""
+        """Return 'Prénom Nom' for a given user id."""
         user = self.get_user_by_id(user_id)
-        return user.get("name") if user else None
+        if user is None:
+            return None
+        return f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or None
+
+    def _name_to_id_map(self) -> dict[str, int]:
+        """Build a name→id map (both orderings, accent-stripped) from the local users DB."""
+        db = self._load_users_db()
+        users = [{"id": int(uid), **user} for uid, user in db.items()]
+        name_to_id, _ = build_name_map(users)
+        return name_to_id
+
+    @staticmethod
+    def _resolve_name(name: str, name_to_id: dict[str, int]) -> int | None:
+        """Look up a patient name (accent-insensitive). Both orderings are pre-indexed in name_to_id."""
+        return name_to_id.get(normalize_name(name.strip()))
 
     def get_echeances_records(self, dayin: str, dayout: str) -> list:
         """
         Get payment schedule records for the given date range.
+        Patient names are replaced by their numeric ID.
 
         Parameters
         ----------
         dayin  : start date, "YYYY-MM-DD"
         dayout : end date,   "YYYY-MM-DD"
+
+        Raises
+        ------
+        KeyError if a patient name cannot be resolved to an ID even after refreshing the cache.
         """
-        data = self.extract(["echeances"], params={"date_start": dayin, "date_end": dayout})
-        return data["echeances"]
+        data = self.extract(["echeances"], params={"dayin": dayin, "dayout": dayout})
+        records = data["echeances"]
+        name_to_id = self._name_to_id_map()
+        missing = {
+            rec["ID Patient"]
+            for rec in records
+            if rec.get("ID Patient") and self._resolve_name(rec["ID Patient"], name_to_id) is None
+        }
+        if missing:
+            self._build_users_db()
+            name_to_id = self._name_to_id_map()
+            still_missing = {n for n in missing if self._resolve_name(n, name_to_id) is None}
+            if still_missing:
+                raise KeyError(f"Unknown patients (not in users DB): {sorted(still_missing)}")
+        for rec in records:
+            name = rec.get("ID Patient")
+            if name:
+                rec["ID Patient"] = self._resolve_name(name, name_to_id)
+        return records
 
     def get_income_records(self, dayin = None, dayout = None) -> list:
         """
@@ -381,7 +412,7 @@ class OrthoASession:
         Returns the sorted list [{path, title}].
         """
         items = self.get_html_table_items(url_name)
-        sorted_items = sorted(items, key=lambda x: _normalize_str(x["title"]))
+        sorted_items = sorted(items, key=lambda x: normalize_name(x["title"]))
 
         base_url_path = self._all_urls[url_name]["url"].split("?")[0]
         cookies = self._parser.orthoAdl.driver.get_cookies()

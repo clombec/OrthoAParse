@@ -15,10 +15,43 @@ All outputs are plain dicts/lists — no PII.
 """
 
 import re
+import unicodedata
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 _TZ_PARIS = ZoneInfo("Europe/Paris")
+
+
+def normalize_name(s: str) -> str:
+    """Lowercase + strip accents for case/accent-insensitive name comparisons."""
+    nfd = unicodedata.normalize("NFD", s)
+    return "".join(c for c in nfd if unicodedata.category(c) != "Mn").casefold()
+
+
+def build_name_map(users: list) -> tuple[dict[str, int], dict[str, list[int]]]:
+    """
+    Build bidirectional name→id lookup maps from a list of user dicts.
+
+    Each user must have 'id' (int), 'first_name' (str) and 'last_name' (str).
+    Both "prénom nom" and "nom prénom" orderings are indexed, normalized
+    (lowercase, accents stripped).
+
+    Returns
+    -------
+    name_to_id  : {normalized_key: smallest_id}   — unambiguous lookup
+    name_to_ids : {normalized_key: [id, ...]}      — all ids (homonym support)
+    """
+    name_to_ids: dict[str, list[int]] = {}
+    for user in users:
+        pid = user["id"]
+        ln = normalize_name(user.get("last_name", "").strip())
+        fn = normalize_name(user.get("first_name", "").strip())
+        for key in (f"{fn} {ln}", f"{ln} {fn}"):
+            name_to_ids.setdefault(key, []).append(pid)
+    for ids in name_to_ids.values():
+        ids.sort()
+    name_to_id = {key: ids[0] for key, ids in name_to_ids.items()}
+    return name_to_id, name_to_ids
 
 
 # ---------------------------------------------------------------------------
@@ -59,16 +92,7 @@ def build_context(data: dict) -> dict:
         'metatype_map'   : {metatype_id_str: metatype_dict}
         'fauteuil_map'   : {fauteuil_id_str: normalized_name}
     """
-    # --- name → [ids], title-cased key, sorted smallest first ---
-    name_to_ids: dict[str, list[int]] = {}
-    for user in data.get("users", []):
-        name = user["name"].title()
-        name_to_ids.setdefault(name, []).append(user["id"])
-    for ids in name_to_ids.values():
-        ids.sort()
-
-    # name_to_id keeps the canonical (smallest) id — used for non-ambiguous lookups
-    name_to_id = {name: ids[0] for name, ids in name_to_ids.items()}
+    name_to_id, name_to_ids = build_name_map(data.get("users", []))
 
     # --- metatype id → metatype data ---
     mf = data.get("MetatypesFauteuils", {})
@@ -212,7 +236,7 @@ def _build_rdvs_index(rdvs_history: list, name_to_ids: dict) -> set:
     """
     index = set()
     for rdv in rdvs_history:
-        patient_name = rdv.get("Patient", "").title()
+        patient_name = normalize_name(rdv.get("Patient", "").strip())
         ids = name_to_ids.get(patient_name, [])
         dt_key = _normalize_dt(rdv.get("Date et heure du RDV", ""))
         if ids and dt_key:

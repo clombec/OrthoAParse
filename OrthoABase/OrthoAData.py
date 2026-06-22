@@ -450,8 +450,9 @@ class OrthoADataParse():
         for user in df_records:
             user_id = user.get(patientId)
             udata = {
-                "id": user_id,  # Assuming the first key is the user ID
-                "name": f"{user.get(firstName)} {user.get(lastName)}", # Assuming the second key is the last name and the third key is the first name
+                "id": user_id,
+                "last_name": user.get(lastName),
+                "first_name": user.get(firstName),
             }
             if GET_ALL_USER_DATA:
                 # Create out structure with the user ID and the full name "Prénom Nom"
