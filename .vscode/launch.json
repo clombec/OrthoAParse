@@ -11,6 +11,14 @@
         },
         {
             // Run all tests with pytest
+            "name": "mainTest",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/mainTest.py",
+            "justMyCode": true
+        },
+        {
+            // Run all tests with pytest
             "name": "pytest — all tests",
             "type": "debugpy",
             "request": "launch",
@@ -42,7 +50,7 @@
             "args": [
                 "tests/",
                 "-v",
-                "-k", "test_extract_data"
+                "-k", "test_connexion_orthoadvance"
             ],
             "justMyCode": true
         }
