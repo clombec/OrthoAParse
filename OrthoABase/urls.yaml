@@ -100,7 +100,8 @@ user_params:
     - ["user", "user_color"]
     - ["user", "archive_delay"]
     - ["user", "user_statistics_group"]
-
+    - ["user", "assure", "couverture_secu", "type_cs"]
+    
 echeances:
   url: "reglements/echeances/;view?expected_date={dayin}&expected_date={dayout}"
   type: csv
