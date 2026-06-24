@@ -22,6 +22,8 @@ Or as a context manager:
 """
 
 import json
+import logging
+import os
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +41,7 @@ USERS_DB_FILE = Path(PROJECT_ROOT) / "users_db.json"
 
 
 class OrthoASession:
-    def __init__(self, urls_file: str = URLS_FILE):
+    def __init__(self, urls_file: str = URLS_FILE, get_all_user_data: bool | None = None):
         self._urls_file = urls_file
         with open(urls_file, "r", encoding="utf-8") as f:
             self._all_urls = yaml.safe_load(f)
@@ -53,6 +55,14 @@ class OrthoASession:
 
         # Give the parser access to the full urls.yaml config
         self._parser.urlsConfig = self._all_urls
+
+        if get_all_user_data is None:
+            get_all_user_data = os.environ.get("GET_ALL_USER_DATA", "").lower() in ("1", "true")
+        self._get_all_user_data = get_all_user_data
+
+        # In-memory users cache — loaded from disk, written back on every change
+        self._users_cache: dict[str, dict] = {}
+        self._load_users_db()
 
     def extract(self, entries: list | None = None, params: dict | None = None) -> dict:
         """
@@ -219,9 +229,8 @@ class OrthoASession:
         """Mark a single act as done using form_data returned by fetch_act."""
         return OrthoASession._post_set_done_via_abspath(url, cookies, form_data)
 
-    def get_users_records(self):
-        data = self.extract(["users"])
-        return data['users']
+    def get_users_records(self) -> list[dict]:
+        return self.get_users_list()
     
     def get_stats_records(self) -> dict:
         """
@@ -235,9 +244,9 @@ class OrthoASession:
         }}
         Patients are identified by ID only — no name in output.
         """
-        data = self.extract(["users", "rdvs_all", "MetatypesFauteuils"])
+        users = self.get_users_list()
+        data  = self.extract(["rdvs_all", "MetatypesFauteuils"])
 
-        users     = data.get("users", [])
         rdvs      = data.get("rdvs_all", [])
         metatypes = data.get("MetatypesFauteuils", {}).get("metatypes", {})
 
@@ -280,9 +289,10 @@ class OrthoASession:
         Returns a dict with keys: 'alldaysyear', 'jt', 'metatypes', 'rdvs_history'.
         Requires entries in urls.yaml for: jt, metatypes, alldaysyear, rdvs_history.
         """
-        base = self.extract(["users", "MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params = {"year": datetime.now().strftime("%Y")})
-        days_next_year = self.extract(["alldaysyear"], params = {"year": str(int(datetime.now().strftime("%Y"))+1)})
+        base = self.extract(["MetatypesFauteuils", "jt", "alldaysyear", "rdvs_history"], params={"year": datetime.now().strftime("%Y")})
+        days_next_year = self.extract(["alldaysyear"], params={"year": str(int(datetime.now().strftime("%Y")) + 1)})
         base["alldaysyear"].extend(days_next_year["alldaysyear"])
+        base["users"] = self.get_users_list()
         ctx = build_context(base)
 
         jt_tables = transform_jt(base["jt"], ctx)
@@ -302,31 +312,111 @@ class OrthoASession:
         }
         return data
 
-    def _load_users_db(self) -> dict:
-        """Load the local users DB {str(id): {name, user_color, ...}} from disk, or return empty dict."""
+    # ------------------------------------------------------------------
+    # Users cache — in-memory dict, persisted to users_db.json
+    # ------------------------------------------------------------------
+
+    def _load_users_db(self) -> None:
+        """Load users_db.json into self._users_cache. Called once at __init__."""
         if USERS_DB_FILE.exists():
             with open(USERS_DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {}
+                self._users_cache = json.load(f)
 
-    def _save_users_db(self, db: dict) -> None:
+    def _save_users_db(self) -> None:
+        """Persist self._users_cache to users_db.json."""
         with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(db, f, ensure_ascii=False, indent=2)
+            json.dump(self._users_cache, f, ensure_ascii=False, indent=2)
 
-    def _build_users_db(self) -> dict:
-        """Fetch users from OrthoAdvance (already enriched with user_params by cleanUpUsers) and save to DB."""
+    def _sync_user_list(self) -> None:
+        """
+        Re-fetch the basic user list and add any new or renamed users to the cache.
+        Saves only if something changed.
+        """
         users = self.extract(["users"])["users"]
-        db = {str(u["id"]): {k: v for k, v in u.items() if k != "id"} for u in users}
-        self._save_users_db(db)
-        return db
+        changed = False
+        for u in users:
+            uid = str(u["id"])
+            entry = self._users_cache.get(uid)
+            if entry is None:
+                self._users_cache[uid] = {
+                    "last_name": u["last_name"],
+                    "first_name": u["first_name"],
+                    "params_fetched": not self._get_all_user_data,
+                }
+                changed = True
+            elif entry.get("last_name") != u["last_name"] or entry.get("first_name") != u["first_name"]:
+                entry["last_name"] = u["last_name"]
+                entry["first_name"] = u["first_name"]
+                changed = True
+        if changed:
+            self._save_users_db()
+
+    def _fetch_user_params(self, user_id: int) -> None:
+        """
+        Fetch extended params (user_color, archive_delay, …) for one user,
+        update the cache, and save immediately so progress survives a crash.
+        """
+        uid = str(user_id)
+        if uid not in self._users_cache:
+            return
+        try:
+            data = self.extract(["user_params"], params={"user_id": user_id})
+            params = data.get("user_params") or {}
+        except Exception as e:
+            logging.warning(f"[users_db] Failed to fetch params for user {user_id}: {e}")
+            return
+        self._users_cache[uid].update(params)
+        self._users_cache[uid]["params_fetched"] = True
+        self._save_users_db()
+
+    def refresh_users_db(self) -> None:
+        """
+        Full rebuild: fetch all users then, if self._get_all_user_data is True, fetch
+        extended params per user with an incremental save after each one.
+        """
+        users = self.extract(["users"])["users"]
+        self._users_cache = {
+            str(u["id"]): {
+                "last_name": u["last_name"],
+                "first_name": u["first_name"],
+                "params_fetched": not self._get_all_user_data,
+            }
+            for u in users
+        }
+        if not self._get_all_user_data:
+            self._save_users_db()
+            return
+        for uid in list(self._users_cache):
+            self._fetch_user_params(int(uid))  # saves after each user
+
+    def get_users_list(self) -> list[dict]:
+        """
+        Return all users as [{id, last_name, first_name, …}] from the local cache.
+        Syncs from OrthoAdvance if the cache is empty.
+        The internal 'params_fetched' flag is stripped from the output.
+        """
+        if not self._users_cache:
+            self._sync_user_list()
+        return [
+            {"id": int(uid), **{k: v for k, v in u.items() if k != "params_fetched"}}
+            for uid, u in self._users_cache.items()
+        ]
 
     def get_user_by_id(self, user_id: int) -> dict | None:
-        """Return the full user record {name, user_color, ...} for a given id. Fetches from DB first."""
-        db = self._load_users_db()
-        key = str(user_id)
-        if key not in db:
-            db = self._build_users_db()
-        return db.get(key)
+        """
+        Return the full record for a given user ID, syncing from OrthoAdvance if not found.
+        If self._get_all_user_data is True and extended params are missing, fetches them on demand.
+        Returns None if the user does not exist.
+        """
+        uid = str(user_id)
+        if uid not in self._users_cache:
+            self._sync_user_list()
+        if uid not in self._users_cache:
+            return None
+        if self._get_all_user_data and not self._users_cache[uid].get("params_fetched", False):
+            self._fetch_user_params(user_id)
+        user = self._users_cache[uid]
+        return {k: v for k, v in user.items() if k != "params_fetched"}
 
     def get_name_by_id(self, user_id: int) -> str | None:
         """Return 'Prénom Nom' for a given user id."""
@@ -336,10 +426,8 @@ class OrthoASession:
         return f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or None
 
     def _name_to_id_map(self) -> dict[str, int]:
-        """Build a name→id map (both orderings, accent-stripped) from the local users DB."""
-        db = self._load_users_db()
-        users = [{"id": int(uid), **user} for uid, user in db.items()]
-        name_to_id, _ = build_name_map(users)
+        """Build a name→id map (both orderings, accent-stripped) from the local users cache."""
+        name_to_id, _ = build_name_map(self.get_users_list())
         return name_to_id
 
     @staticmethod
@@ -359,7 +447,7 @@ class OrthoASession:
 
         Raises
         ------
-        KeyError if a patient name cannot be resolved to an ID even after refreshing the cache.
+        KeyError if a patient name cannot be resolved to an ID even after syncing.
         """
         data = self.extract(["echeances"], params={"dayin": dayin, "dayout": dayout})
         records = data["echeances"]
@@ -370,7 +458,7 @@ class OrthoASession:
             if rec.get("ID Patient") and self._resolve_name(rec["ID Patient"], name_to_id) is None
         }
         if missing:
-            self._build_users_db()
+            self._sync_user_list()
             name_to_id = self._name_to_id_map()
             still_missing = {n for n in missing if self._resolve_name(n, name_to_id) is None}
             if still_missing:

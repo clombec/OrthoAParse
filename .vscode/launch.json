@@ -15,6 +15,10 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/mainTest.py",
+            "env": 
+            {
+                "GET_ALL_USER_DATA": "true" 
+            },
             "justMyCode": true
         },
         {
