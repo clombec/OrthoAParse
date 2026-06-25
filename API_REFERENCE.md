@@ -10,6 +10,7 @@ Module: `orthoaget.session` — class `OrthoASession`.
 ### `OrthoASession(urls_file=URLS_FILE)`
 
 Opens a Chrome session and connects to OrthoAdvance.  
+On subsequent calls, the session is restored from the persistent Chrome profile — no re-login required as long as the server-side session is still valid.  
 Raises `OrthoAConnectionError` if the connection fails.
 
 ```python
@@ -201,62 +202,57 @@ Returns all rows of a paginated HTML browse-list table defined in `urls.yaml`.
 
 ## Write methods
 
-The two-step flow — fetch then confirm — separates reading from writing so the user can validate before any change is committed.
+The two-step flow — fetch then confirm — separates reading from writing so the user can validate before any change is committed.  
+Both methods require an open `OrthoASession`. Since the persistent Chrome profile avoids re-login, opening a session is fast.
 
 ```python
-# Step 1 — inside the session (Chrome open)
 with OrthoASession() as session:
     records = session.get_proth_records()
-    cookies = session.get_cookies()
 
-# Step 2 — Chrome closed; one act at a time
-form_data, is_expired = OrthoASession.fetch_act(records[0]["url"], cookies)
-if is_expired:
-    # re-open a new OrthoASession to get fresh cookies
-    ...
-else:
-    # show form_data to the user, then on confirm:
-    OrthoASession.confirm_act_done(records[0]["url"], cookies, form_data)
+    # One act at a time — show form_display to the user, then on confirm:
+    form_data, form_display, is_expired = session.fetch_act(records[0]["url"])
+    if not is_expired:
+        session.confirm_act_done(records[0]["url"], form_data)
+```
+
+For multiple acts, reuse the same session:
+
+```python
+with OrthoASession() as session:
+    records = session.get_proth_records()
+    for rec in records:
+        form_data, form_display, is_expired = session.fetch_act(rec["url"])
+        if not is_expired:
+            session.confirm_act_done(rec["url"], form_data)
 ```
 
 ---
 
-### `get_cookies() → list[dict]`
+### `fetch_act(url: str) → tuple[dict | None, dict | None, bool]`
 
-Returns the current Chrome session cookies. **Must be called before `end()` / exiting the `with` block.**
+GETs a single act page and parses its form fields.
 
-Store the result and pass it to `fetch_act` and `confirm_act_done`.
-
----
-
-### `fetch_act(url: str, cookies: list[dict]) → tuple[dict | None, dict | None, bool]` *(static)*
-
-GETs a single act page using existing cookies and parses its form fields.
-
-**Parameters**:
+**Parameter**:
 - `url`: full act URL (the `url` field from `get_proth_records`)
-- `cookies`: list from `get_cookies()`
 
 **Returns** — `(form_data, form_display, is_expired)`:
 - `form_data`: raw dict `{name: value}` for passing to `confirm_act_done` — select fields contain the path value (e.g. `/medical/prothesiste/actes/36`)
 - `form_display`: same structure but select fields contain the human-readable label (e.g. `Analyse empreinte go max`) — use this for display only
-- `is_expired`: `True` if cookies have expired (session redirect detected) — open a new `OrthoASession` to get fresh cookies and retry; both dicts are `None` in that case
+- `is_expired`: `True` if the session has expired (redirect detected); both dicts are `None` in that case
 
-**Raises** — `RuntimeError` if the GET fails or no form is found.
+**Raises** — `RuntimeError` if no form is found at the URL.
 
 ---
 
-### `confirm_act_done(url: str, cookies: list[dict], form_data: dict) → bool` *(static)*
+### `confirm_act_done(url: str, form_data: dict) → bool`
 
-POSTs the act form with `done=1` to mark it as realised.
+Submits the act form with `done=1` to mark it as realised.
 
 **Parameters**:
 - `url`: same URL passed to `fetch_act`
-- `cookies`: list from `get_cookies()`
 - `form_data`: dict returned by `fetch_act`
 
-**Returns** — `True` on success.  
-**Raises** — `RuntimeError` if the POST fails.
+**Returns** — `True` on success.
 
 ---
 
@@ -301,7 +297,7 @@ Prefer the domain-specific methods above; use `extract` only to access entries n
 | `OrthoAdl.OrthoAConnectionError` | `__init__` | Login / connection failure |
 | `OrthoAdl.OrthoADownloadError` | any extract method | Page download failure |
 | `KeyError` | `extract()` | Unknown entry in `urls.yaml` |
-| `RuntimeError` | `fetch_act`, `confirm_act_done`, `sort_html_table_items` | Unexpected HTTP response |
+| `RuntimeError` | `fetch_act`, `sort_html_table_items` | No form found / unexpected response |
 
 ```python
 import OrthoABase.OrthoAdl as OrthoAdl

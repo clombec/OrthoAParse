@@ -26,6 +26,7 @@ import keyring
 
 KEYRING_SERVICE = "OrthoAGet"  # Service name for keyring credentials
 
+
 class OrthoAConnectionError(Exception):
     """Raised when OrthoAdvance is unreachable or login fails."""
     pass
@@ -81,11 +82,12 @@ class OrthoAdl():
 
     def connect(self, download_dir):
         logging.info("Connecting to OrthoAdvance...")
+        profile_dir = os.path.join(PROJECT_ROOT, "chrome_profile")
         try:
-            # Configure Chrome options for downloads
             chrome_options = webdriver.ChromeOptions()
-            chrome_options.add_argument("--headless")  # Hidden mode. Comment to show the browser
-            chrome_options.add_argument("--disable-gpu")  # Needed for some Chrome versions
+            chrome_options.add_argument("--headless=new")  # Comment to show the browser
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument(f"--user-data-dir={profile_dir}")
             prefs = {
                 "download.default_directory": download_dir,
                 "download.prompt_for_download": False,
@@ -94,7 +96,6 @@ class OrthoAdl():
             }
             chrome_options.add_experimental_option("prefs", prefs)
 
-            # Initialize Chrome driver
             try:
                 self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
             except Exception:
@@ -106,48 +107,51 @@ class OrthoAdl():
                 )
 
             logging.info("Chrome driver initialized.")
-            # 1. Access the user selection page
-            connect_url = f"{self.OrthoAUrlBase}/#!/login/connect"
-            self.driver.get(connect_url)
-            logging.info(f"Login page loaded. URL: {connect_url}")
 
+            # Navigate to base URL and wait for Angular to resolve the route.
+            # If the session is still active, Angular lands on the app; otherwise it
+            # redirects to the login page — same behaviour as a regular user.
+            self.driver.get(self.OrthoAUrlBase)
+            WebDriverWait(self.driver, 10).until(
+                lambda d: (
+                    d.execute_script("return document.readyState") == "complete"
+                    and "#!" in d.current_url
+                )
+            )
+
+            if "login" not in self.driver.current_url:
+                logging.info("Session active from persistent profile, skipping login.")
+                return
+
+            logging.info("Login required.")
             result, element = self.wait_login_flow(10)
 
             if result == "user_page" and element:
                 element.click()
-                # 3. Wait for the password page
                 logging.info("Waiting for password page...")
                 WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.ID, "password"))
-                    )
+                )
 
-            elif result == "password_page":
-                pass
-
-            # 4.1 fill in the email field
+            assert self.OrthoAlogin and self.OrthoAPwd
             email_field = self.driver.find_element(By.ID, "email")
             email_field.clear()
             email_field.send_keys(self.OrthoAlogin)
-            # 4.2 fill in the password field
             password_field = self.driver.find_element(By.ID, "password")
             password_field.send_keys(self.OrthoAPwd)
-
-            #Tab to trigger connexion button to become availalbe
             password_field.send_keys(webdriver.Keys.TAB)
 
             logging.info("Credentials entered.")
-            # 5. Click on the "Me connecter" button
             login_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "btn-form-submit"))
             )
             login_button.click()
 
             logging.info("Login submitted.")
-            # 6. Wait for main page after login
             WebDriverWait(self.driver, 10).until(
                 lambda d: (
-                d.execute_script("return document.readyState") == "complete" and
-                    d.current_url != connect_url
+                    d.execute_script("return document.readyState") == "complete"
+                    and "login" not in d.current_url
                 )
             )
             logging.info("Login successful.")

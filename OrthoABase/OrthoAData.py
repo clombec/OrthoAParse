@@ -1,6 +1,7 @@
 from functools import reduce
 from operator import getitem
 from datetime import datetime
+from urllib.parse import urlparse
 from . import OrthoAdl
 import logging
 import os
@@ -38,6 +39,90 @@ class OrthoADataParse():
 
     def end(self):
         self.orthoAdl.end()
+
+    def parseHtmlForm(self, url: str) -> dict | None:
+        """Navigate to url, parse its POST form fields, and return
+        {"form_data": {...}, "form_display": {...}}, or None if redirected (session expired)."""
+        from bs4 import BeautifulSoup
+        from selenium.webdriver.support.ui import WebDriverWait
+
+        driver = self.orthoAdl.driver
+        driver.get(url)
+        WebDriverWait(driver, 10).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        if urlparse(driver.current_url).path.rstrip("/") != urlparse(url).path.rstrip("/"):
+            return None
+
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        forms = soup.find_all("form")
+        form = next(
+            (f for f in forms if str(f.get("method", "")).lower() == "post"),
+            forms[0] if forms else None,
+        )
+        if not form:
+            raise RuntimeError(f"No form found at {url}")
+
+        form_data: dict = {}
+        form_display: dict = {}
+        for tag in form.find_all("input"):
+            name = tag.get("name")
+            if not name:
+                continue
+            input_type = str(tag.get("type", "text")).lower()
+            if input_type in ("checkbox", "radio"):
+                if tag.has_attr("checked"):
+                    form_data[name] = form_display[name] = tag.get("value", "on")
+            elif input_type != "submit":
+                form_data[name] = form_display[name] = tag.get("value", "")
+        for tag in form.find_all("select"):
+            name = tag.get("name")
+            if not name:
+                continue
+            selected = tag.find("option", selected=True)
+            opt = selected or tag.find("option")
+            form_data[name] = opt.get("value", "") if opt else ""
+            form_display[name] = opt.get_text(strip=True) if opt else ""
+        for tag in form.find_all("textarea"):
+            name = tag.get("name")
+            if name:
+                form_data[name] = form_display[name] = tag.get_text()
+
+        patient_tag = soup.select_one("div.well ul.list-unstyled li a")
+        if patient_tag:
+            form_display["patient"] = patient_tag.get_text(strip=True)
+
+        return {"form_data": form_data, "form_display": form_display}
+
+    def postActDone(self, url: str, form_data: dict) -> bool:
+        """Navigate to url and submit its form with form_data + done=1 via JavaScript."""
+        from selenium.webdriver.support.ui import WebDriverWait
+
+        driver = self.orthoAdl.driver
+        driver.get(url)
+        WebDriverWait(driver, 10).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        merged = {**form_data, "done": "1"}
+        driver.execute_script("""
+            var form = document.querySelector('form');
+            var data = arguments[0];
+            for (var key in data) {
+                var el = form.elements[key];
+                if (el) {
+                    el.value = data[key];
+                } else {
+                    var inp = document.createElement('input');
+                    inp.type = 'hidden'; inp.name = key; inp.value = data[key];
+                    form.appendChild(inp);
+                }
+            }
+            form.submit();
+        """, merged)
+        WebDriverWait(driver, 10).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        return True
 
     def parseCsv(self, csv_url, structure_name):
         rows = None

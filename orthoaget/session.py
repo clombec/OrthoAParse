@@ -16,9 +16,9 @@ Usage:
 Or as a context manager:
     with OrthoASession() as session:
         records = session.get_proth_records()
-        cookies = session.get_cookies()
-    form_data, form_display, is_expired = OrthoASession.fetch_act(records[0]["url"], cookies)
-    OrthoASession.confirm_act_done(records[0]["url"], cookies, form_data)
+        form_data, form_display, is_expired = session.fetch_act(records[0]["url"])
+        if not is_expired:
+            session.confirm_act_done(records[0]["url"], form_data)
 """
 
 import json
@@ -27,7 +27,6 @@ import os
 import requests
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlparse
 
 import yaml
 from OrthoABase import DownloadDir
@@ -104,6 +103,8 @@ class OrthoASession:
                 data = self._parser.parseHtml(url, structure_name)
             elif data_type == "html_paginated":
                 data = self._parser.parseHtmlPaginated(url, structure_name)
+            elif data_type == "html_form":
+                data = self._parser.parseHtmlForm(url)
 
             if not DEBUG_NO_DL_IN:
                 DownloadDir.clearDownloadDir(self._download_dir)
@@ -129,105 +130,22 @@ class OrthoASession:
                 rec["patient_url"] = f"{base_url}{rec['patient_url']}"
         return records
 
-    def get_cookies(self) -> list[dict]:
-        """Return current session cookies. Call while Chrome is still open."""
-        return self._parser.orthoAdl.driver.get_cookies()
-
-    @staticmethod
-    def fetch_act(url: str, cookies: list[dict]) -> tuple[dict | None, dict | None, bool]:
+    def fetch_act(self, url: str) -> tuple[dict | None, dict | None, bool]:
         """
-        GET a single act page using existing cookies and parse its form fields.
+        GET a single act page and parse its form fields.
         Returns (form_data, form_display, is_expired).
         - form_data:    raw values for POST (pass to confirm_act_done)
         - form_display: same but select fields show their text label instead of the path value
-        - is_expired:   True if cookies have expired (redirect detected) — open a new
-                        OrthoASession to refresh cookies and retry.
+        - is_expired:   True if the session has expired (redirect detected)
         """
-        from bs4 import BeautifulSoup
-
-        req_session = requests.Session()
-        for cookie in cookies:
-            req_session.cookies.set(
-                cookie["name"], cookie["value"],
-                domain=cookie.get("domain"), path=cookie.get("path", "/"),
-            )
-        resp = req_session.get(url, timeout=10, allow_redirects=True)
-        if resp.status_code != 200:
-            raise RuntimeError(f"GET {url} failed: HTTP {resp.status_code}")
-        if urlparse(resp.url).path.rstrip("/") != urlparse(url).path.rstrip("/"):
+        result = self.extract(["acte_form"], params={"url": url}).get("acte_form")
+        if result is None:
             return None, None, True
+        return result["form_data"], result["form_display"], False
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        forms = soup.find_all("form")
-        form = next(
-            (f for f in forms if str(f.get("method", "")).lower() == "post"),
-            forms[0] if forms else None,
-        )
-        if not form:
-            raise RuntimeError(f"No form found at {url}")
-
-        form_data = {}
-        form_display = {}
-        for tag in form.find_all("input"):
-            name = tag.get("name")
-            if not name:
-                continue
-            input_type = str(tag.get("type", "text")).lower()
-            if input_type in ("checkbox", "radio"):
-                if tag.has_attr("checked"):
-                    form_data[name] = form_display[name] = tag.get("value", "on")
-            elif input_type != "submit":
-                form_data[name] = form_display[name] = tag.get("value", "")
-        for tag in form.find_all("select"):
-            name = tag.get("name")
-            if not name:
-                continue
-            selected = tag.find("option", selected=True)
-            opt = selected or tag.find("option")
-            form_data[name] = opt.get("value", "") if opt else ""
-            form_display[name] = opt.get_text(strip=True) if opt else ""
-        for tag in form.find_all("textarea"):
-            name = tag.get("name")
-            if name:
-                form_data[name] = form_display[name] = tag.get_text()
-
-        patient_tag = soup.select_one("div.well ul.list-unstyled li a")
-        if patient_tag:
-            form_display["patient"] = patient_tag.get_text(strip=True)
-
-        return form_data, form_display, False
-
-    @staticmethod
-    def _post_set_done_via_abspath(acte_url: str, cookies: list[dict], form_data: dict) -> bool:
-        """POST a pre-parsed act form with done=1."""
-        form_data["done"] = "1"
-
-        cookie_header = "; ".join(
-            f"{c['name']}={c['value']}" for c in cookies
-        ).replace('"', '\\"')
-        data_args = " ".join(f'-F "{k}={v}"' for k, v in form_data.items())
-        print(f'curl -X POST "{acte_url}" -H "Cookie: {cookie_header}" {data_args} -L')
-
-        req_session = requests.Session()
-        for cookie in cookies:
-            req_session.cookies.set(
-                cookie["name"], cookie["value"],
-                domain=cookie.get("domain"), path=cookie.get("path", "/"),
-            )
-        post_resp = req_session.post(
-            acte_url,
-            data=form_data,
-            allow_redirects=True,
-            timeout=10,
-        )
-        if post_resp.status_code in (200, 302):
-            return True
-        raise RuntimeError(f"POST to {acte_url} failed: HTTP {post_resp.status_code}")
-
-    @staticmethod
-    def confirm_act_done(url: str, cookies: list[dict], form_data: dict) -> bool:
+    def confirm_act_done(self, url: str, form_data: dict) -> bool:
         """Mark a single act as done using form_data returned by fetch_act."""
-        return OrthoASession._post_set_done_via_abspath(url, cookies, form_data)
+        return self._parser.postActDone(url, form_data)
 
     def get_users_records(self) -> list[dict]:
         return self.get_users_list()

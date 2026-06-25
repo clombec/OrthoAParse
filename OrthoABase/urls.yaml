@@ -1,3 +1,7 @@
+acte_form:
+  url: "{url}"
+  type: html_form
+
 rdvs_history:
   url: "rdvs/rdvs/history"
   type: csv

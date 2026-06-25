@@ -11,9 +11,9 @@ if __name__ == "__main__":
     with OrthoASession() as session:
 #        data = session.get_stats_records()
 #        data = session.get_calendar_records()
-#        data = session.get_users_records()
-        data = session.get_echeances_records(dayin = "2022-01-01", dayout = "2027-12-31")
-        with open("outdata/echeances.json", "w", encoding="utf-8") as f:
+        data = session.get_users_records()
+#        data = session.get_echeances_records(dayin = "2022-01-01", dayout = "2027-12-31")
+        with open("outdata/usertest.json", "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
         # Test échéances
