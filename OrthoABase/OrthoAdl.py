@@ -158,6 +158,8 @@ class OrthoAdl():
             time.sleep(2)  # Wait a bit for any post-login redirects or loads
 
         except Exception as e:
+            if getattr(self, "driver", None):
+                self.driver.quit()
             raise OrthoAConnectionError(
                 f"Impossible de se connecter à OrthoAdvance : {e}"
             ) from e

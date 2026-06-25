@@ -51,17 +51,20 @@ class OrthoASession:
 
         # Single connect — Chrome starts here
         self._parser = OrthoADataParse(self._download_dir)
+        try:
+            # Give the parser access to the full urls.yaml config
+            self._parser.urlsConfig = self._all_urls
 
-        # Give the parser access to the full urls.yaml config
-        self._parser.urlsConfig = self._all_urls
+            if get_all_user_data is None:
+                get_all_user_data = os.environ.get("GET_ALL_USER_DATA", "").lower() in ("1", "true")
+            self._get_all_user_data = get_all_user_data
 
-        if get_all_user_data is None:
-            get_all_user_data = os.environ.get("GET_ALL_USER_DATA", "").lower() in ("1", "true")
-        self._get_all_user_data = get_all_user_data
-
-        # In-memory users cache — loaded from disk, written back on every change
-        self._users_cache: dict[str, dict] = {}
-        self._load_users_db()
+            # In-memory users cache — loaded from disk, written back on every change
+            self._users_cache: dict[str, dict] = {}
+            self._load_users_db()
+        except Exception:
+            self._parser.end()
+            raise
 
     def extract(self, entries: list | None = None, params: dict | None = None) -> dict:
         """
@@ -462,5 +465,5 @@ class OrthoASession:
         try:
             self.end()
         except Exception:
-            print("OrthoASession: error during cleanup", exc_info=True)
+            logging.exception("OrthoASession: error during cleanup")
 
