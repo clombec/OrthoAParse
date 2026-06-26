@@ -82,7 +82,7 @@ Shortcut: returns only the patient name for a given ID.
 
 ---
 
-### `get_stats_records() → dict`
+### `get_user_rdv_records() → dict`
 
 Computes appointment statistics per patient.
 
@@ -188,6 +188,35 @@ Defaults to today only.
   ...
 ]
 ```
+
+---
+
+### `get_anonymized_user_params() → dict[str, dict]`
+
+Returns all users from the local cache (`users_db.json`), anonymised — identity fields (`last_name`, `first_name`) are stripped.
+
+**Returns** — `{str(user_id): {user_color, archive_delay, user_statistics_group, type_cs, ...}}` — no names, no `params_fetched` flag.
+
+---
+
+### `get_anonymized_data() → dict`
+
+Aggregates all anonymised data into a single dict. Convenience wrapper — equivalent to calling each method individually.  
+**Note**: includes `get_calendar_records()` which makes one HTTP request per open day and may be slow.
+
+**Returns**:
+
+```python
+{
+  "rdvs":      {...},   # get_user_rdv_records()
+  "calendar":  {...},   # get_calendar_records()
+  "echeances": [...],   # get_echeances_records("2022-01-01", "2027-12-31")
+  "stats":     {...},   # extract(["stat_periodes"])["stat_periodes"]
+  "users":     {...},   # get_anonymized_user_params()
+}
+```
+
+No patient or user names appear in any of the returned structures.
 
 ---
 
