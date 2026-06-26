@@ -153,7 +153,7 @@ class OrthoASession:
     def get_users_records(self) -> list[dict]:
         return self.get_users_list()
     
-    def get_stats_records(self) -> dict:
+    def get_user_rdv_records(self) -> dict:
         """
         Build per-patient stats from rdvs_all and users.
 
@@ -400,6 +400,38 @@ class OrthoASession:
             dayout = datetime.now().strftime("%Y-%m-%d")
         data = self.extract(["recette_jour"], params={"dayin": dayin, "dayout": dayout})
         return data["recette_jour"]
+
+    def get_anonymized_user_params(self) -> dict[str, dict]:
+        """
+        Return all users from the local cache, anonymised (no last_name / first_name).
+        Keys are str(user_id); values are the stored params minus identity fields.
+        Syncs from OrthoAdvance if the cache is empty.
+        """
+        if not self._users_cache:
+            self._sync_user_list()
+        excluded = {"last_name", "first_name", "params_fetched"}
+        return {
+            uid: {k: v for k, v in u.items() if k not in excluded}
+            for uid, u in self._users_cache.items()
+        }
+
+    def get_anonymized_data(self) -> dict:
+        """
+        Aggregate all anonymised stats into a single dict:
+          - 'rdvs'     : get_user_rdv_records()
+          - 'calendar' : get_calendar_records()
+          - 'echeances': get_echeances_records("2022-01-01", "2027-12-31")
+          - 'stats'    : extract(["stat_periodes"])["stat_periodes"]
+          - 'users'    : get_user_params_ano()
+        No patient or user names appear in the output.
+        """
+        return {
+            "rdvs":      self.get_user_rdv_records(),
+            "calendar":  self.get_calendar_records(),
+            "echeances": self.get_echeances_records(dayin="2022-01-01", dayout="2027-12-31"),
+            "stats":     self.extract(["stat_periodes"]).get("stat_periodes"),
+            "users":     self.get_user_params_ano(),
+        }
 
     def user_url(self, user_id) -> str:
         """Return the OrthoAdvance clinique URL for a given user ID."""
