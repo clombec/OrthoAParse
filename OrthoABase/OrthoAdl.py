@@ -99,10 +99,14 @@ class OrthoAdl():
             try:
                 self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
             except Exception:
-                # ChromeDriver cache may be stale (e.g. after a Chrome update) — force re-download and retry once
+                # ChromeDriver cache may be stale (e.g. after a Chrome update) — clear cache and retry once
                 logging.warning("ChromeDriver failed to start — clearing cache and retrying...")
+                import shutil
+                wdm_cache = os.path.expanduser("~/.wdm/drivers/chromedriver")
+                if os.path.exists(wdm_cache):
+                    shutil.rmtree(wdm_cache)
                 self.driver = webdriver.Chrome(
-                    service=Service(ChromeDriverManager(cache_valid_range=0).install()),
+                    service=Service(ChromeDriverManager().install()),
                     options=chrome_options
                 )
 
