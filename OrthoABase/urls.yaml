@@ -19,6 +19,7 @@ rdvs_all:
     - ["Date et heure du RDV"]
     - ["Plage planning"]
     - ["Praticien"]
+    - ["Type d'acte"]
 
 jt:  # All journées types
   url: "planning/;jtypes_json_view"

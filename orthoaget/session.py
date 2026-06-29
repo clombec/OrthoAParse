@@ -199,8 +199,9 @@ class OrthoASession:
 
             plage = rdv.get("Plage planning", "")
             times = plage_lookup.get(plage, {"temps_praticien": None, "temps_total": None})
+            acte_type = rdv.get("Type d'acte", "")
 
-            result[str(patient_id)]["rdvs"].append({"date": date, "plage": plage, **times})
+            result[str(patient_id)]["rdvs"].append({"date": date, "plage": plage, "acte_type": acte_type, **times})
 
         return result
 
@@ -422,15 +423,13 @@ class OrthoASession:
           - 'calendar' : get_calendar_records()
           - 'echeances': get_echeances_records("2022-01-01", "2027-12-31")
           - 'stats'    : extract(["stat_periodes"])["stat_periodes"]
-          - 'users'    : get_user_params_ano()
         No patient or user names appear in the output.
         """
         return {
-            "rdvs":      self.get_user_rdv_records(),
+            "users_rdvs":      self.get_user_rdv_records(),
             "calendar":  self.get_calendar_records(),
             "echeances": self.get_echeances_records(dayin="2022-01-01", dayout="2027-12-31"),
             "stats":     self.extract(["stat_periodes"]).get("stat_periodes"),
-            "users":     self.get_user_params_ano(),
         }
 
     def user_url(self, user_id) -> str:
