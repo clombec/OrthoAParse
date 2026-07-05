@@ -38,8 +38,7 @@ class OrthoADownloadError(Exception):
 
 
 class OrthoAdl():
-    def __init__(self, download_dir, no_dl=False):
-        self.no_dl = no_dl
+    def __init__(self, download_dir):
         self.download_dir = download_dir
 
         config_path = f"{PROJECT_ROOT}/OrthoABase/config.yaml"
@@ -61,8 +60,7 @@ class OrthoAdl():
                 "Configurez l'application via la page web."
             )
 
-        if not self.no_dl:
-            self.connect(download_dir)
+        self.connect(download_dir)
 
     def wait_login_flow(self, timeout=10):
         def check(d):
@@ -288,8 +286,7 @@ class OrthoAdl():
             ) from e
 
     def end(self):
-        if not self.no_dl:
-            self.driver.quit()
+        self.driver.quit()
 
 
 """

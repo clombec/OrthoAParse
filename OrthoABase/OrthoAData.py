@@ -12,18 +12,9 @@ import json
 from bs4 import BeautifulSoup
 import re
 
-DEBUG_NO_DL_IN = False
-
 class OrthoADataParse():
     def __init__(self, download_dir):
-        if not os.path.exists(download_dir) or not os.listdir(download_dir):
-            self.DEBUG_NO_DL = False
-        else:
-            self.DEBUG_NO_DL = DEBUG_NO_DL_IN
-        if self.DEBUG_NO_DL:
-            self.orthoAdl = OrthoAdl.OrthoAdl(download_dir, no_dl=True)
-        else:
-            self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
+        self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
         self.cleanUpSwitch = {
             "MetatypesFauteuils": self.cleanUpMetatypesFauteuils,
             "users": self.cleanUpUsers,
@@ -126,10 +117,7 @@ class OrthoADataParse():
 
     def parseCsv(self, csv_url, structure_name):
         rows = None
-        if not self.DEBUG_NO_DL:
-            csv_file = self.orthoAdl.downloadCsv(csv_url)  # raises OrthoADownloadError on failure
-        else:
-            csv_file = os.path.join(self.orthoAdl.download_dir, "export.csv")
+        csv_file = self.orthoAdl.downloadCsv(csv_url)  # raises OrthoADownloadError on failure
         logging.info(f"Looking for CSV file at {csv_file}")
         if os.path.exists(csv_file):
             # Use pandas read_csv with python engine for more lenient parsing in the face of mixed separators.
@@ -148,8 +136,7 @@ class OrthoADataParse():
 
     def parseJson(self, json_url, structure_name):
         rows = None
-        if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageText(json_url)  # raises OrthoADownloadError on failure
+        self.orthoAdl.downloadPageText(json_url)  # raises OrthoADownloadError on failure
         json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
         if os.path.exists(json_file):
             with open(json_file, "r", encoding="utf-8") as f:
@@ -166,8 +153,7 @@ class OrthoADataParse():
     def parseHtml(self, html_url, structure_name):
         rows = None
         htmlpage = "page_content.html"
-        if not self.DEBUG_NO_DL:
-            self.orthoAdl.downloadPageHtml(html_url, htmlpage)  # raises OrthoADownloadError on failure
+        self.orthoAdl.downloadPageHtml(html_url, htmlpage)  # raises OrthoADownloadError on failure
         html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
         if os.path.exists(html_file):
             with open(html_file, "r", encoding="utf-8") as f:
@@ -196,8 +182,7 @@ class OrthoADataParse():
         while True:
             url = f"{html_url}?batch_start={batch_start}"
             htmlpage = "page_content.html"
-            if not self.DEBUG_NO_DL:
-                self.orthoAdl.downloadPageHtml(url, htmlpage)
+            self.orthoAdl.downloadPageHtml(url, htmlpage)
             html_file = os.path.join(self.orthoAdl.download_dir, htmlpage)
             if not os.path.exists(html_file):
                 break
@@ -473,8 +458,7 @@ class OrthoADataParse():
         columns = None
         url = f"{self.orthoAdl.OrthoAUrlBase}/{json_url}"
         while url:
-            if not self.DEBUG_NO_DL:
-                self.orthoAdl.downloadPageText(url, fullUrl=True)
+            self.orthoAdl.downloadPageText(url, fullUrl=True)
             json_file = os.path.join(self.orthoAdl.download_dir, "page_content.txt")
             if not os.path.exists(json_file):
                 break

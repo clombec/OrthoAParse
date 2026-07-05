@@ -30,7 +30,7 @@ from pathlib import Path
 
 import yaml
 from OrthoABase import DownloadDir
-from OrthoABase.OrthoAData import OrthoADataParse, DEBUG_NO_DL_IN
+from OrthoABase.OrthoAData import OrthoADataParse
 from orthoaget import PROJECT_ROOT
 from orthoaget.transform import build_context, build_name_map, get_open_days, transform_daily_events, transform_jt, normalize_name
 
@@ -46,8 +46,7 @@ class OrthoASession:
             self._all_urls = yaml.safe_load(f)
 
         self._download_dir = DownloadDir.setupDownloadDir("downloads")
-        if not DEBUG_NO_DL_IN:
-            DownloadDir.clearDownloadDir(self._download_dir)
+        DownloadDir.clearDownloadDir(self._download_dir)
 
         # Single connect — Chrome starts here
         self._parser = OrthoADataParse(self._download_dir)
@@ -109,8 +108,7 @@ class OrthoASession:
             elif data_type == "html_form":
                 data = self._parser.parseHtmlForm(url)
 
-            if not DEBUG_NO_DL_IN:
-                DownloadDir.clearDownloadDir(self._download_dir)
+            DownloadDir.clearDownloadDir(self._download_dir)
 
             if data is not None:
                 parsed_data[structure_name] = data
