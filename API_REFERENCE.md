@@ -220,15 +220,6 @@ No patient or user names appear in any of the returned structures.
 
 ---
 
-### `get_html_table_items(url_name: str) → list[dict]`
-
-Returns all rows of a paginated HTML browse-list table defined in `urls.yaml`.
-
-**Parameter** — `url_name`: key in `urls.yaml` with type `html_paginated`.  
-**Returns** — list of dicts `{"path": str, "title": str}`.
-
----
-
 ## Write methods
 
 The two-step flow — fetch then confirm — separates reading from writing so the user can validate before any change is committed.  
@@ -242,17 +233,6 @@ with OrthoASession() as session:
     form_data, form_display, is_expired = session.fetch_act(records[0]["url"])
     if not is_expired:
         session.confirm_act_done(records[0]["url"], form_data)
-```
-
-For multiple acts, reuse the same session:
-
-```python
-with OrthoASession() as session:
-    records = session.get_proth_records()
-    for rec in records:
-        form_data, form_display, is_expired = session.fetch_act(rec["url"])
-        if not is_expired:
-            session.confirm_act_done(rec["url"], form_data)
 ```
 
 ---

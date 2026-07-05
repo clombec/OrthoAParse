@@ -436,7 +436,7 @@ class OrthoASession:
         """Return the OrthoAdvance clinique URL for a given user ID."""
         return f"{self._parser.orthoAdl.OrthoAUrlBase}/ang/#!/users/{user_id}/clinique/compact/"
 
-    def get_html_table_items(self, url_name: str) -> list[dict]:
+    def _get_html_table_items(self, url_name: str) -> list[dict]:
         """
         Return [{path, title}] for all rows of a paginated HTML browse-list table.
         url_name must be a key in urls.yaml with type "html_paginated".
@@ -451,7 +451,7 @@ class OrthoASession:
 
         Returns the sorted list [{path, title}].
         """
-        items = self.get_html_table_items(url_name)
+        items = self._get_html_table_items(url_name)
         sorted_items = sorted(items, key=lambda x: normalize_name(x["title"]))
 
         base_url_path = self._all_urls[url_name]["url"].split("?")[0]
