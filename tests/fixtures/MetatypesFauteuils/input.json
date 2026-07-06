@@ -1,0 +1,17 @@
+{
+  "sequences": {
+    "/config-application/metatypes/1": {"dr": 20, "duree": 30, "value": "P20"}
+  },
+  "enumerates": {
+    "metatypes": {
+      "list": [
+        {"name": "/config-application/metatypes/1", "value": "P20", "duree": 30, "color": "#ff0000"}
+      ]
+    },
+    "fauteuils": {
+      "list": [
+        {"name": "3", "value": "Fauteuil 3"}
+      ]
+    }
+  }
+}

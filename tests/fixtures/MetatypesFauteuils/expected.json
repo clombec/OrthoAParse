@@ -1,0 +1,10 @@
+{
+  "metatypes": {
+    "1": {"dr": 20, "duree": 30, "value": "P20", "color": "#ff0000"}
+  },
+  "fauteuils": {
+    "fauteuils": {
+      "3": {"value": "Fauteuil 3"}
+    }
+  }
+}

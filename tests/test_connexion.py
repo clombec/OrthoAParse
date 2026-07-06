@@ -1,14 +1,27 @@
 """
 test_connexion.py
 
-Pytest tests — verify connection to OrthoAdvance and CSV download,
-using real credentials from OrthoABase/config.yaml file.
+Level 1 tests — real OrthoAdl / OrthoASession against the live OrthoAdvance site,
+using real credentials from OrthoABase/config.yaml and the OS keyring.
+
+For the mocked layers (OrthoADataParse, OrthoASession via FakeOrthoAdl), see
+test_orthoadata_mocked.py and test_session_mocked.py — those don't need credentials
+and run in CI.
 """
 
 import os
 import pytest
 from OrthoABase.OrthoAdl import OrthoAdl, OrthoAConnectionError
+from orthoaget import PROJECT_ROOT
 from orthoaget.session import OrthoASession
+
+pytestmark = [
+    pytest.mark.real,
+    pytest.mark.skipif(
+        not os.path.exists(f"{PROJECT_ROOT}/OrthoABase/config.yaml"),
+        reason="OrthoABase/config.yaml missing — configure the app before running real tests.",
+    ),
+]
 
 
 def test_connexion_orthoadvance(tmp_path):

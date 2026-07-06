@@ -19,6 +19,13 @@ Or as a context manager:
         form_data, form_display, is_expired = session.fetch_act(records[0]["url"])
         if not is_expired:
             session.confirm_act_done(records[0]["url"], form_data)
+
+Testing, without a real Selenium/OrthoAdvance connection — everything above OrthoAdl
+(parsing, cleanUp, session logic) still runs for real, only the browser layer is
+simulated (see tests/fakes/fake_orthoadl.py and tests/fakes/test_config.py for the
+fixed fixtures/users_db paths and per-test error injection):
+    with OrthoASession(test_mode=True) as session:
+        users = session.get_users_list()
 """
 
 import json
@@ -40,16 +47,29 @@ USERS_DB_FILE = Path(PROJECT_ROOT) / "users_db.json"
 
 
 class OrthoASession:
-    def __init__(self, urls_file: str = URLS_FILE, get_all_user_data: bool | None = None):
+    def __init__(self, urls_file: str = URLS_FILE, get_all_user_data: bool | None = None,
+                 test_mode: bool = False):
+        """
+        test_mode : if True, everything below OrthoASession runs against FakeOrthoAdl
+                    instead of a real Selenium/OrthoAdvance connection — parsing, cleanUp
+                    and session logic still run for real. OrthoASession itself never
+                    imports OrthoAdl or FakeOrthoAdl: it only forwards this bool to
+                    OrthoADataParse, which is the one place that decides between the real
+                    and fake implementations. This is the only test-related parameter on
+                    OrthoASession. Per-test error injection (connection/download failures)
+                    goes through the shared CONFIG object in tests/fakes/test_config.py.
+        """
         self._urls_file = urls_file
         with open(urls_file, "r", encoding="utf-8") as f:
             self._all_urls = yaml.safe_load(f)
 
+        self._users_db_file = USERS_DB_FILE
+
         self._download_dir = DownloadDir.setupDownloadDir("downloads")
         DownloadDir.clearDownloadDir(self._download_dir)
 
-        # Single connect — Chrome starts here
-        self._parser = OrthoADataParse(self._download_dir)
+        # Single connect — Chrome starts here (or FakeOrthoAdl, in test_mode)
+        self._parser = OrthoADataParse(self._download_dir, test_mode=test_mode)
         try:
             # Give the parser access to the full urls.yaml config
             self._parser.urlsConfig = self._all_urls
@@ -238,13 +258,13 @@ class OrthoASession:
 
     def _load_users_db(self) -> None:
         """Load users_db.json into self._users_cache. Called once at __init__."""
-        if USERS_DB_FILE.exists():
-            with open(USERS_DB_FILE, "r", encoding="utf-8") as f:
+        if self._users_db_file.exists():
+            with open(self._users_db_file, "r", encoding="utf-8") as f:
                 self._users_cache = json.load(f)
 
     def _save_users_db(self) -> None:
         """Persist self._users_cache to users_db.json."""
-        with open(USERS_DB_FILE, "w", encoding="utf-8") as f:
+        with open(self._users_db_file, "w", encoding="utf-8") as f:
             json.dump(self._users_cache, f, ensure_ascii=False, indent=2)
 
     def _sync_user_list(self) -> None:

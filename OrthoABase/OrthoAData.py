@@ -13,8 +13,15 @@ from bs4 import BeautifulSoup
 import re
 
 class OrthoADataParse():
-    def __init__(self, download_dir):
-        self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
+    def __init__(self, download_dir, test_mode: bool = False):
+        # test_mode=True swaps in FakeOrthoAdl (tests/fakes/) instead of the real OrthoAdl,
+        # to exercise the parsing/cleanUp layer without Selenium. OrthoADataParse is the
+        # only place that decides between the two — callers above it just pass the bool.
+        if test_mode:
+            from tests.fakes.fake_orthoadl import FakeOrthoAdl
+            self.orthoAdl = FakeOrthoAdl(download_dir)
+        else:
+            self.orthoAdl = OrthoAdl.OrthoAdl(download_dir)  # raises OrthoAConnectionError if login fails
         self.cleanUpSwitch = {
             "MetatypesFauteuils": self.cleanUpMetatypesFauteuils,
             "users": self.cleanUpUsers,
