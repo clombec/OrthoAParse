@@ -86,13 +86,23 @@ class OrthoAdl():
             chrome_options.add_argument("--headless=new")  # Comment to show the browser
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument(f"--user-data-dir={profile_dir}")
+            # Contournement : la fenêtre de composition headless de Chrome est parfois
+            # peinte à l'écran malgré IsWindowVisible=False (bug DWM connu sous Windows).
+            # La pousser hors-écran empêche de la voir, même si le bug persiste.
+            chrome_options.add_argument("--window-position=-32000,-32000")
+            chrome_options.add_argument("--window-size=1920,1080")
             prefs = {
                 "download.default_directory": download_dir,
                 "download.prompt_for_download": False,
                 "download.directory_upgrade": True,
-                "safebrowsing.enabled": True
+                "safebrowsing.enabled": True,
+                "credentials_enable_service": False,
+                "profile.password_manager_enabled": False,
+                "profile.password_manager_leak_detection": False,
+                "profile.default_content_setting_values.notifications": 2,
             }
             chrome_options.add_experimental_option("prefs", prefs)
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
             try:
                 self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
